@@ -51,3 +51,23 @@ def test_find_config_file_returns_none_in_empty_dir(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     monkeypatch.delenv("LAWRADAR_CONFIG", raising=False)
     assert find_config_file() is None
+
+
+def test_ai_and_review_policy_defaults_and_env(tmp_path, monkeypatch):
+    import yaml as _yaml
+
+    monkeypatch.chdir(tmp_path)
+    for var in ("LAWRADAR_CONFIG", "LAWRADAR_AI_ENABLED", "LAWRADAR_AI_COMMAND",
+                "LAWRADAR_REVIEW_POLICY"):
+        monkeypatch.delenv(var, raising=False)
+    config = load_settings()
+    assert config.ai_enabled is False and config.review_policy == "manual"
+    monkeypatch.setenv("LAWRADAR_AI_ENABLED", "true")
+    assert load_settings().ai_enabled is True
+    bad = tmp_path / "bad.yaml"
+    bad.write_text(_yaml.safe_dump({"review_policy": "auto_publish"}),
+                   encoding="utf-8")
+    import pytest as _pytest
+
+    with _pytest.raises(ValueError, match="review_policy"):
+        load_settings(str(bad))

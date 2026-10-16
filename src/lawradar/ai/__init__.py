@@ -1,1 +1,1 @@
-"""Optional pluggable LLM summariser (Milestone 4+). Core works without it."""
+"""Pluggable summarisers (Milestone 4): heuristic default, optional command."""

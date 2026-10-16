@@ -391,3 +391,119 @@ def list_citations(conn: sqlite3.Connection,
 def count_reports(conn: sqlite3.Connection) -> int:
     row = conn.execute("SELECT COUNT(*) AS c FROM change_reports").fetchone()
     return int(row["c"])
+
+
+# -- review tasks (audit trail) + publication --------------------------------
+
+def create_review_task(
+    conn: sqlite3.Connection,
+    *,
+    document_version_id: int | None,
+    change_report_id: int | None,
+    reason: str,
+    severity: str = "medium",
+) -> int:
+    cursor = conn.execute(
+        """INSERT INTO review_tasks
+           (document_version_id, change_report_id, reason, severity)
+           VALUES (?, ?, ?, ?)""",
+        (document_version_id, change_report_id, reason, severity),
+    )
+    return int(cursor.lastrowid)
+
+
+def get_review_task(conn: sqlite3.Connection,
+                    task_id: int) -> sqlite3.Row | None:
+    return conn.execute("SELECT * FROM review_tasks WHERE id=?",
+                        (task_id,)).fetchone()
+
+
+def list_review_tasks(
+    conn: sqlite3.Connection, status: str | None = None, limit: int = 100
+) -> list[sqlite3.Row]:
+    if status is None:
+        return list(conn.execute(
+            "SELECT t.*, r.document_id AS document_id FROM review_tasks t "
+            "LEFT JOIN change_reports r ON r.id=t.change_report_id "
+            "ORDER BY t.id DESC LIMIT ?", (limit,)))
+    return list(conn.execute(
+        "SELECT t.*, r.document_id AS document_id FROM review_tasks t "
+        "LEFT JOIN change_reports r ON r.id=t.change_report_id "
+        "WHERE t.status=? ORDER BY t.id DESC LIMIT ?", (status, limit)))
+
+
+def count_review_tasks_by_status(conn: sqlite3.Connection) -> dict[str, int]:
+    return {row["status"]: int(row["c"]) for row in conn.execute(
+        "SELECT status, COUNT(*) AS c FROM review_tasks GROUP BY status")}
+
+
+def resolve_review_task(
+    conn: sqlite3.Connection, task_id: int, *, status: str, reviewer: str,
+    review_notes: str = "",
+) -> None:
+    conn.execute(
+        """UPDATE review_tasks SET status=?, reviewer=?, review_notes=?,
+           resolved_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id=?""",
+        (status, reviewer, review_notes[:4000], task_id),
+    )
+
+
+def set_report_verification(
+    conn: sqlite3.Connection, report_id: int, verification: str,
+    reviewer_notes: str = "",
+) -> None:
+    conn.execute(
+        "UPDATE change_reports SET verification_status=?, reviewer_notes=? "
+        "WHERE id=?",
+        (verification, reviewer_notes[:4000], report_id),
+    )
+
+
+def publish_report(
+    conn: sqlite3.Connection, report_id: int, reviewer_notes: str = ""
+) -> None:
+    """Mark a report published. Only called from an approved human review."""
+    conn.execute(
+        """UPDATE change_reports SET verification_status='approved',
+           reviewer_notes=?,
+           published_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id=?""",
+        (reviewer_notes[:4000], report_id),
+    )
+
+
+def set_citation_verification(
+    conn: sqlite3.Connection, citation_id: int, verification: str
+) -> None:
+    conn.execute(
+        "UPDATE citations SET verification_status=? WHERE id=?",
+        (verification, citation_id),
+    )
+
+
+def set_ai_attempts(
+    conn: sqlite3.Connection, report_id: int, attempts: list
+) -> None:
+    conn.execute(
+        "UPDATE change_reports SET ai_attempts=? WHERE id=?",
+        (json.dumps(attempts), report_id),
+    )
+
+
+def update_report_summary(
+    conn: sqlite3.Connection,
+    report_id: int,
+    *,
+    summary: str,
+    claims: list,
+    ai_attempts: list,
+) -> None:
+    """Persist an applied re-summarisation.
+
+    Attempt history (including the model's own warnings) lives in
+    ``ai_attempts``; human ``reviewer_notes`` are never overwritten here.
+    """
+    conn.execute(
+        "UPDATE change_reports SET summary=?, claims_json=?, ai_attempts=? "
+        "WHERE id=?",
+        (summary, json.dumps(claims), json.dumps(ai_attempts), report_id),
+    )

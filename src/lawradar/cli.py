@@ -1,4 +1,4 @@
-"""Command-line interface for India Law Radar (Milestone 3).
+"""Command-line interface for India Law Radar (Milestone 4).
 
 Implemented commands (all functional, no placeholders):
   lawradar init              — create data dir, local settings.yaml, migrate db
@@ -12,6 +12,10 @@ Implemented commands (all functional, no placeholders):
   lawradar reports list      — change reports with type + verification status
   lawradar reports show <id> — report detail with claims + citations
   lawradar reports generate  — backfill reports missed by auto-generation
+  lawradar reports verify <id> — deterministic citation check
+  lawradar reports summarise <id> [--ai] — reword summary (validated)
+  lawradar review --list     — pending human-review queue
+  lawradar review <id> --approve|--reject|--changes --notes "..."
 """
 from __future__ import annotations
 
@@ -98,6 +102,31 @@ def build_parser() -> argparse.ArgumentParser:
         "generate", help="Backfill missing reports (ingest already auto-generates)")
     p_rgen.add_argument("--document", type=int, default=None)
     p_rgen.add_argument("--limit", type=int, default=100)
+    p_rverify = reports_sub.add_parser(
+        "verify", help="Deterministic citation check (not a human review)")
+    p_rverify.add_argument("report_id", type=int)
+    p_rsum = reports_sub.add_parser(
+        "summarise", help="Reword a report summary (heuristic; --ai if configured)")
+    p_rsum.add_argument("report_id", type=int)
+    p_rsum.add_argument("--ai", action="store_true",
+                        help="Use the configured external AI command")
+
+    p_review = sub.add_parser("review", help="Human review queue + decisions")
+    p_review.add_argument("report_id", nargs="?", type=int, default=None,
+                          help="Report id to decide (omit with --list)")
+    p_review.add_argument("--list", action="store_true",
+                          help="Show the review queue")
+    p_review.add_argument("--status", default="pending",
+                          help="Queue filter for --list")
+    p_review.add_argument("--approve", action="store_true")
+    p_review.add_argument("--reject", action="store_true")
+    p_review.add_argument("--changes", action="store_true",
+                          help="Request changes (same as needs_changes)")
+    p_review.add_argument("--reviewer", default="",
+                          help="Reviewer name (default: local)")
+    p_review.add_argument("--notes", default="",
+                          help="Review notes (required to reject/request changes)")
+    p_review.add_argument("--limit", type=int, default=50)
     return parser
 
 
@@ -164,7 +193,7 @@ def cmd_init(args: argparse.Namespace) -> int:
     return 0
 
 
-APP_LABEL = "India Law Radar v0.3.0 (Milestone 3)"
+APP_LABEL = "India Law Radar v0.4.0 (Milestone 4)"
 
 
 def _sqlite_path(db_url: str, data_dir: Path) -> Path | None:
@@ -417,9 +446,11 @@ def cmd_reports(args: argparse.Namespace) -> int:
                     pair = (f"v{old}->v{r['new_version_id']}"
                             if old is not None
                             else f"v{r['new_version_id']} (first)")
+                    pub = "published" if r["published_at"] else "unpublished"
                     print(f"[{r['id']}] {r['document_title']} "
                           f"(doc={r['document_id']} {pair}) "
-                          f"type={r['change_type']} status={r['verification_status']}")
+                          f"type={r['change_type']} status={r['verification_status']} "
+                          f"{pub}")
                 if not rows:
                     print("No reports yet. Ingest a source first.")
         elif args.reports_command == "show":
@@ -441,7 +472,8 @@ def cmd_reports(args: argparse.Namespace) -> int:
             else:
                 print(f"[{report['id']}] {report['document_title']}")
                 print(f"  change_type={report['change_type']} "
-                      f"verification={report['verification_status']}")
+                      f"verification={report['verification_status']} "
+                      f"published={report['published_at'] or 'no'}")
                 print(f"  summary: {report['summary']}")
                 if affected:
                     print(f"  affected: {', '.join(affected)}")
@@ -466,9 +498,100 @@ def cmd_reports(args: argparse.Namespace) -> int:
                           f"type={item['change_type']}")
                 if not created:
                     print("Nothing to generate — all versions already reported.")
+        elif args.reports_command == "verify":
+            from lawradar.reporting.verify import verify_report
+
+            try:
+                outcome = verify_report(conn, args.report_id)
+            except ValueError as exc:
+                print(str(exc), file=sys.stderr)
+                return 2
+            if args.json:
+                print(json.dumps(outcome, indent=2))
+            else:
+                print(f"report {outcome['report_id']}: {outcome['status']} "
+                      f"(checked={outcome['checked']} failed={outcome['failed']})")
+                for item in outcome["results"]:
+                    mark = "ok" if item["status"] == "verified" else "FAIL"
+                    print(f"  [{mark}] {item['locator_type']}: "
+                          f"{item['locator_value']}")
+                    for reason in item["reasons"]:
+                        print(f"    - {reason}")
+            return 0 if outcome["status"] == "verified" else 1
+        elif args.reports_command == "summarise":
+            from lawradar.ai.base import AISummariserError
+            from lawradar.reporting.summarise import resummarise
+
+            try:
+                outcome = resummarise(conn, config, args.report_id,
+                                      use_ai=args.ai)
+            except (ValueError, AISummariserError) as exc:
+                print(f"summarise rejected: {exc}", file=sys.stderr)
+                return 1
+            if args.json:
+                print(json.dumps(outcome, indent=2))
+            else:
+                print(f"report {outcome['report_id']}: summary "
+                      f"{outcome['status']} via {outcome['summariser']}")
     finally:
         conn.close()
     return 0
+
+
+def cmd_review(args: argparse.Namespace) -> int:
+    from lawradar.db import store
+    from lawradar.ingestion.pipeline import _db_path
+    from lawradar.review.queue import audit_trail, queue_summary, resolve
+
+    config = _effective_config(args)
+    setup_logging(config.log_level, config.log_file)
+    store.init_db(_db_path(config))
+    conn = store.connect(_db_path(config))
+    try:
+        if args.list or args.report_id is None:
+            tasks = store.list_review_tasks(conn, args.status, args.limit)
+            summary = queue_summary(conn)
+            if args.json:
+                print(json.dumps({"summary": summary,
+                                  "tasks": [dict(t) for t in tasks]},
+                                 indent=2, default=str))
+            else:
+                print(f"review queue: {summary['pending']} pending / "
+                      f"{summary['total']} total "
+                      f"(approved={summary['approved']} "
+                      f"rejected={summary['rejected']} "
+                      f"needs_changes={summary['needs_changes']})")
+                for task in tasks:
+                    print(f"  [task {task['id']}] report={task['change_report_id']} "
+                          f"status={task['status']} severity={task['severity']}")
+                    print(f"    reason: {task['reason']}")
+            return 0
+        decisions = [name for name, wanted in
+                     (("approved", args.approve), ("rejected", args.reject),
+                      ("needs_changes", args.changes)) if wanted]
+        if len(decisions) != 1:
+            print("choose exactly one of --approve, --reject, --changes",
+                  file=sys.stderr)
+            return 2
+        try:
+            outcome = resolve(conn, report_id=args.report_id,
+                              decision=decisions[0], reviewer=args.reviewer,
+                              notes=args.notes)
+        except Exception as exc:  # noqa: BLE001 — ReviewError/ValueError
+            print(f"review rejected: {exc}", file=sys.stderr)
+            return 1
+        trail = audit_trail(conn, args.report_id)
+        if args.json:
+            print(json.dumps({**outcome, "audit_trail": trail}, indent=2,
+                             default=str))
+        else:
+            print(f"report {outcome['report_id']}: {outcome['decision']} "
+                  f"by {outcome['reviewer']} "
+                  f"(tasks resolved: {outcome['tasks_resolved']})")
+            print(f"  audit trail entries: {len(trail)}")
+        return 0
+    finally:
+        conn.close()
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -486,6 +609,8 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_documents(args)
     if args.command == "reports":
         return cmd_reports(args)
+    if args.command == "review":
+        return cmd_review(args)
     parser.error(f"unknown command: {args.command}")
     return 2
 

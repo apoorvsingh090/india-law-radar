@@ -25,3 +25,10 @@ M3/M4.
 ingest (one draft per new version; duplicates create nothing) and by
 `reports generate`. `review_tasks` still arrives with the review queue
 (M4).
+
+**Milestone 4 update:** `review_tasks` is written (auto-queue on
+`unknown`/non-`ok`/amendment signals; every decision appends history),
+`citations.verification_status` is set by `reports verify`,
+`change_reports.published_at` is set only by `review --approve`, and
+migration `002` adds `change_reports.ai_attempts` for model-attempt
+history.

@@ -1,1 +1,1 @@
-"""Review queue + audit trail (Milestone 4+)."""
+"""Human review queue + audit trail (Milestone 4) via ``lawradar.review.queue``."""

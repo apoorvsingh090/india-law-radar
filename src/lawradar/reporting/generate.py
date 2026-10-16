@@ -243,6 +243,11 @@ def generate_for_document(conn, document_id: int) -> dict | None:
     report_id = save_report(conn, document_id,
                             old_row.get("id") if old_row else None,
                             new_row["id"], report)
+    from lawradar.review.queue import auto_queue
+
+    auto_queue(conn, report_id=report_id, change_type=report["change_type"],
+               new_version_id=new_row["id"],
+               extraction_status=new_row.get("extraction_status", ""))
     conn.commit()
     return {"report_id": report_id, "change_type": report["change_type"],
             "document_id": document_id,

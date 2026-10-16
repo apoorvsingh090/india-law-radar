@@ -26,6 +26,9 @@ DEFAULTS: dict = {
     "poll_default_minutes": 1440,
     "http_timeout_seconds": 30,
     "http_max_bytes": 50_000_000,
+    "review_policy": "manual",
+    "ai_enabled": False,
+    "ai_command": "",
 }
 
 ENV_MAP = {
@@ -34,6 +37,9 @@ ENV_MAP = {
     "LAWRADAR_DB_URL": "db_url",
     "LAWRADAR_LOG_LEVEL": "log_level",
     "LAWRADAR_LOG_FILE": "log_file",
+    "LAWRADAR_REVIEW_POLICY": "review_policy",
+    "LAWRADAR_AI_ENABLED": "ai_enabled",
+    "LAWRADAR_AI_COMMAND": "ai_command",
     "LAWRADAR_CONFIG": None,  # path to config file itself, handled separately
 }
 
@@ -48,6 +54,9 @@ class AppConfig:
     poll_default_minutes: int = 1440
     http_timeout_seconds: int = 30
     http_max_bytes: int = 50_000_000
+    review_policy: str = "manual"
+    ai_enabled: bool = False
+    ai_command: str = ""
     config_path: str = ""
     extra: dict = field(default_factory=dict)
 
@@ -61,6 +70,9 @@ class AppConfig:
             "poll_default_minutes": self.poll_default_minutes,
             "http_timeout_seconds": self.http_timeout_seconds,
             "http_max_bytes": self.http_max_bytes,
+            "review_policy": self.review_policy,
+            "ai_enabled": self.ai_enabled,
+            "ai_command": self.ai_command,
         }
 
 
@@ -115,6 +127,13 @@ def load_settings(explicit: str | None = None) -> AppConfig:
             merged[int_key] = int(merged[int_key])
         except (TypeError, ValueError) as exc:
             raise ValueError(f"Invalid integer for {int_key}: {merged[int_key]!r}") from exc
+    if isinstance(merged["ai_enabled"], str):
+        merged["ai_enabled"] = (
+            merged["ai_enabled"].strip().lower() in ("1", "true", "yes", "on"))
+    if merged["review_policy"] not in ("manual",):
+        raise ValueError(
+            f"Unknown review_policy: {merged['review_policy']!r} "
+            "(Milestone 4 supports only 'manual')")
     known = set(AppConfig.__dataclass_fields__) - {"config_path", "extra"}
     extra = {k: v for k, v in file_data.items() if k not in DEFAULTS}
     return AppConfig(

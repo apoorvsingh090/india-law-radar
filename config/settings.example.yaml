@@ -9,3 +9,13 @@ log_file: ""
 poll_default_minutes: 1440
 http_timeout_seconds: 30
 http_max_bytes: 50000000
+# Review policy (Milestone 4): only 'manual' — reports stay unpublished
+# until a human runs `lawradar review <id> --approve`.
+review_policy: manual
+# Optional AI summariser (Milestone 4): off by default. Core works without it.
+# To enable, set ai_enabled: true and ai_command to a local executable that
+# reads {system, draft, evidence} JSON on stdin and writes
+# {summary, claims, warnings} JSON on stdout. Model output is validated;
+# malformed output or invented citations are rejected, never repaired.
+ai_enabled: false
+ai_command: ""

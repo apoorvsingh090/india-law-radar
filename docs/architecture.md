@@ -21,3 +21,9 @@ CLI (argparse) → config.py → logging_config.py → local data dir + sqlite
   persisted to `change_reports` + `citations`. Ingest auto-generates the
   draft; `reports generate` backfills. Deterministic diff always lands
   before any AI summariser (M4).
+- M4 adds: `review/queue.py` (auto-queue uncertain reports, approve-gated
+  `published_at`, notes-required rejections, append-only `review_tasks`
+  audit trail) → `reporting/verify.py` (machine citation check, never a
+  human sign-off) → `ai/` (`HeuristicSummariser` default,
+  `CommandSummariser` only with `ai.enabled` + `ai.command`, output
+  validated, failures stored in `ai_attempts`).

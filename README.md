@@ -1,10 +1,9 @@
 # India Law Radar
 
 Source-verifiable monitoring of official Indian legal documents.
-**Milestone 3 (this release):** version comparison — deterministic
-raw + normalised diffs, section attribution, change-type classification,
-validated + persisted change reports with claims and citations,
-auto-generation on ingest.
+**Milestone 4 (this release):** human review — approval-gated
+publication, citation verification, review audit trail, and an optional
+validated AI summariser (core still needs no model).
 
 > Scope honesty: this MVP does **not** claim complete coverage of Indian law,
 > is not a substitute for a qualified advocate, and every future change report
@@ -51,8 +50,17 @@ lawradar documents search <q>  keyword search (LIKE; FTS arrives in M5)
 lawradar reports list        show reports (filter --document ID)
 lawradar reports show <id>   report + claims + citations
 lawradar reports generate    backfill anything ingest missed
+lawradar reports verify <id>  deterministic citation check (exit 1 on fail)
+lawradar reports summarise <id> [--ai]  reword summary (validated, no model by default)
+lawradar review --list        pending human-review queue
+lawradar review <id> --approve|--reject|--changes --reviewer R --notes "…"
 lawradar --help                full usage
 ```
+
+Review policy is `manual`: reports are **unpublished** until a human
+approves them; rejections and change-requests require notes. AI output
+can never bypass schema validation — malformed JSON or invented
+citations are rejected and recorded as failed attempts.
 
 Try without network: `lawradar ingest fixture-sample` twice — the second
 run reports `changed=0` (idempotent dedup). All fixture titles carry a
@@ -80,7 +88,8 @@ data/          local-only runtime data (git-ignored except README/.gitkeep)
 
 - M1: skeleton, config, logging, CLI health, tests, docs (done)
 - M2: source registry, safe fetcher, hashing/dedup, extraction (done)
-- M3: deterministic diff, change reports with citations (done here)
+- M3: deterministic diff, change reports with citations (done)
+- M4: review queue, citation checks, optional AI summariser (done here)
 - M3: deterministic version comparison
 - M4: structured reports + review queue (LLM optional, never required)
 - M5: web UI + search

@@ -1,15 +1,43 @@
-# India Law Radar — example source registry (Milestone 2+).
-# Milestone 1 does not poll any source. This file documents the intended
-# shape; adapters arrive in Milestone 2/6 after terms verification.
-sources: []
-# Example entry (NOT active):
-# - id: indiacode
-#   name: India Code
-#   base_url: https://www.indiacode.nic.in/
-#   source_type: legislation_catalogue
-#   jurisdiction: central
-#   access_method: manual_import_first
-#   terms_review_status: not_reviewed
-#   poll_interval_minutes: 1440
-#   enabled: false
-#   coverage_notes: "Verify terms + robots before any automated access."
+# India Law Radar — example source registry (Milestone 2).
+# Copy to config/sources.yaml to customise (sources.yaml is git-ignored).
+# Real official sources stay disabled until terms + robots + rate limits
+# are verified per docs/source-policy.md.
+sources:
+  - id: fixture-sample
+    name: "[FIXTURE] Labelled demo documents (no legal force)"
+    base_url: https://example.invalid/fixture/
+    source_type: fixture
+    jurisdiction: central
+    access_method: fixture
+    terms_review_status: reviewed_ok
+    poll_interval_minutes: 1440
+    rate_limit_seconds: 0
+    enabled: true
+    coverage_notes: "Bundled demo files only. Never real legal data."
+    storage_policy: allowed
+
+  - id: manual-sample
+    name: "Manual import (operator-supplied file)"
+    base_url: https://www.indiacode.nic.in/
+    source_type: legislation_catalogue
+    jurisdiction: central
+    access_method: manual_import
+    terms_review_status: not_reviewed
+    poll_interval_minutes: 10080
+    rate_limit_seconds: 1
+    enabled: true
+    coverage_notes: "Usage: lawradar ingest manual-sample --file PATH --title TITLE. Verify India Code terms before any automated access."
+    storage_policy: unknown
+
+  - id: indiacode
+    name: "India Code (official legislation catalogue)"
+    base_url: https://www.indiacode.nic.in/
+    source_type: legislation_catalogue
+    jurisdiction: central
+    access_method: http_poll
+    terms_review_status: not_reviewed
+    poll_interval_minutes: 1440
+    rate_limit_seconds: 5
+    enabled: false
+    coverage_notes: "NOT VERIFIED: check terms + robots before enabling. M2 http_poll only probes the base URL."
+    storage_policy: unknown

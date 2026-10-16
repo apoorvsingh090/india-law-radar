@@ -1,1 +1,1 @@
-"""HTML/PDF text extraction (Milestone 2+). OCR stays optional."""
+"""HTML/text-based-PDF extraction with review flagging (Milestone 2)."""

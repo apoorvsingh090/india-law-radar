@@ -13,3 +13,10 @@ Rules:
 
 M1 creates only a `_meta(schema_version)` marker table via `lawradar init`
 so the sqlite path is proven before the real schema lands.
+
+**Milestone 2 update:** `migrations/001_init.sql` creates the full schema
+(sources, documents, document_versions with UNIQUE(document_id,
+content_sha256), change_reports, citations, ingestion_runs, review_tasks).
+`lawradar init` applies migrations; the pipeline writes sources,
+documents, versions, and runs. Reports/citations/review rows arrive in
+M3/M4.

@@ -1,1 +1,1 @@
-"""Repository layer (Milestone 2+). Single implementation, SQLite locally."""
+"""Repository layer (Milestone 2): SQLite via ``lawradar.db.store``."""

@@ -1,7 +1,9 @@
 # India Law Radar
 
 Source-verifiable monitoring of official Indian legal documents.
-**Milestone 1 (this release):** project skeleton — config, logging, CLI (`init`, `health`), tests.
+**Milestone 2 (this release):** document ingestion — source registry,
+safe fetcher (allowlist + throttling), SHA-256 dedup, HTML/text-PDF
+extraction with review flagging, manual import, fixture demo, provenance.
 
 > Scope honesty: this MVP does **not** claim complete coverage of Indian law,
 > is not a substitute for a qualified advocate, and every future change report
@@ -32,13 +34,25 @@ pytest
 Expected: `lawradar health` prints `health: OK` with three PASS lines;
 `pytest` passes (unit + integration).
 
-## CLI (Milestone 1)
+## CLI (Milestone 2)
 
 ```text
-lawradar init [--force]        create ./data, config/settings.yaml, empty sqlite db
+lawradar init [--force]        dirs + config + migrate sqlite schema
 lawradar health [--json]       config + data-dir + sqlite checks (no network)
+lawradar sources list          registry with check timestamps
+lawradar sources check <id>    registry probe for one source
+lawradar ingest <source-id>    ingest fixture / manual / http-probe source
+lawradar ingest --all          ingest all enabled sources
+lawradar ingest manual-sample --file PATH --title "T" [--doc-id ID]
+lawradar documents list        stored documents + version counts
+lawradar documents show <id>   document + versions + extraction status
+lawradar documents search <q>  keyword search (LIKE; FTS arrives in M5)
 lawradar --help                full usage
 ```
+
+Try without network: `lawradar ingest fixture-sample` twice — the second
+run reports `changed=0` (idempotent dedup). All fixture titles carry a
+`[FIXTURE]` marker and must never be presented as real legal findings.
 
 Overrides: `--config PATH`, `--data-dir DIR`, `--log-level LEVEL`,
 or env vars `LAWRADAR_CONFIG`, `LAWRADAR_DATA_DIR`, `LAWRADAR_DB_URL`,
@@ -50,8 +64,9 @@ and `.env.example`.
 ```text
 config/        example YAML (local settings.yaml is git-ignored)
 docs/          architecture, data-model, source-policy, evaluation, limitations
-src/lawradar/  cli, config, logging + package stubs for Milestones 2-5
-migrations/    SQL migrations (start in Milestone 2)
+src/lawradar/  cli, config, logging, db/store, sources/*, ingestion/*,
+               extraction/* + stubs for Milestones 3-5
+migrations/    001_init.sql (full MVP schema)
 tests/         unit + integration + fixtures + evaluation notes
 scripts/       operator helpers (runbook arrives with real-source pilot)
 data/          local-only runtime data (git-ignored except README/.gitkeep)
@@ -59,8 +74,8 @@ data/          local-only runtime data (git-ignored except README/.gitkeep)
 
 ## Roadmap
 
-- M1 (done here): skeleton, config, logging, CLI health, tests, docs
-- M2: source registry, safe fetcher, hashing/dedup, HTML/PDF extraction
+- M1: skeleton, config, logging, CLI health, tests, docs (done)
+- M2: source registry, safe fetcher, hashing/dedup, extraction (done here)
 - M3: deterministic version comparison
 - M4: structured reports + review queue (LLM optional, never required)
 - M5: web UI + search

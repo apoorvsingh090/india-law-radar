@@ -12,4 +12,9 @@
 6. A failed run must not mark a source successfully checked; a missing
    document is not a repeal without evidence.
 
-Real-source verification status: **none yet** (M1 fixture-free skeleton).
+Real-source verification status: **none yet** — `indiacode` stays
+`enabled: false` + `terms: not_reviewed`. Verified in M2: the `fixture`
+adapter (labelled demo data, no network) and the `manual_import` flow
+(operator-supplied file + recorded provenance). M2 `http_poll` only probes
+a source's own base URL under the allowlist; per-document discovery waits
+for M6 terms verification.

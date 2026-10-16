@@ -1,4 +1,4 @@
-"""Command-line interface for India Law Radar (Milestone 5).
+"""Command-line interface for India Law Radar (Milestone 6).
 
 Implemented commands (all functional, no placeholders):
   lawradar init              — create data dir, local settings.yaml, migrate db
@@ -17,6 +17,7 @@ Implemented commands (all functional, no placeholders):
   lawradar review --list     — pending human-review queue
   lawradar review <id> --approve|--reject|--changes --notes "..."
   lawradar serve [--host 127.0.0.1] [--port 8080] [--token ...]
+  lawradar eval                run the curated pilot evaluation set
 """
 from __future__ import annotations
 
@@ -136,6 +137,8 @@ def build_parser() -> argparse.ArgumentParser:
     p_serve.add_argument("--token", default="",
                          help="Shared secret gating review POSTs (else open "
                               "on loopback)")
+
+    sub.add_parser("eval", help="Run the curated pilot evaluation set")
     return parser
 
 
@@ -202,7 +205,7 @@ def cmd_init(args: argparse.Namespace) -> int:
     return 0
 
 
-APP_LABEL = "India Law Radar v0.5.0 (Milestone 5)"
+APP_LABEL = "India Law Radar v0.6.0 (Milestone 6)"
 
 
 def _sqlite_path(db_url: str, data_dir: Path) -> Path | None:
@@ -623,6 +626,28 @@ def cmd_serve(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_eval(args: argparse.Namespace) -> int:
+    from lawradar.evaluation.runner import run
+
+    setup_logging(getattr(args, "log_level", None) or "INFO", "")
+    result = run()
+    if args.json:
+        print(json.dumps({"metrics": result.metrics, "cases": result.cases},
+                         indent=2))
+    else:
+        print("Pilot evaluation (bounded fixture set — see SCOPE)")
+        print(f"  cases: {result.metrics['cases_passed']}/"
+              f"{result.metrics['cases']} passed")
+        print(f"  change recall:      {result.metrics['change_recall']:.0%}")
+        print(f"  citation correctness: {result.metrics['citation_correctness']:.0%}")
+        print(f"  status errors:      {result.metrics['status_errors']}")
+        print(f"  failed runs visible: {result.metrics['failed_runs_visible']}")
+        for case in result.cases:
+            print(f"  [{'PASS' if case['pass'] else 'FAIL'}] {case['case']}")
+        print("These numbers do NOT generalise beyond the curated set.")
+    return 0 if result.metrics["cases_passed"] == result.metrics["cases"] else 1
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
@@ -642,6 +667,8 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_review(args)
     if args.command == "serve":
         return cmd_serve(args)
+    if args.command == "eval":
+        return cmd_eval(args)
     parser.error(f"unknown command: {args.command}")
     return 2
 

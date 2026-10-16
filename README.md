@@ -1,11 +1,13 @@
 # India Law Radar
 
 Source-verifiable monitoring of official Indian legal documents.
-**Milestone 5 (this release):** web interface + full-text search —
-dashboard, filterable change feed, report detail, document pages, FTS5
-search with LIKE fallback, source registry, review queue with web
-approve/reject, coverage disclosure, and a small JSON API. Zero new
-dependencies (stdlib HTTP server).
+**Milestone 6 (this release — pilot):** real-source groundwork —
+live robots/reachability findings per source (India Code migrated to
+`indiacode.gov.in`), a Legislative listing parser for operator-saved
+pages, eGazette URL helpers (unreachable from sandbox — not bypassed),
+a repeatable 7-case evaluation (`lawradar eval`, 7/7 measured), coverage
+notes, and a failure runbook. All official adapters stay disabled
+pending operator verification.
 
 > Scope honesty: this MVP does **not** claim complete coverage of Indian law,
 > is not a substitute for a qualified advocate, and every future change report
@@ -98,7 +100,8 @@ data/          local-only runtime data (git-ignored except README/.gitkeep)
 - M2: source registry, safe fetcher, hashing/dedup, extraction (done)
 - M3: deterministic diff, change reports with citations (done)
 - M4: review queue, citation checks, optional AI summariser (done)
-- M5: web UI, FTS search, JSON API (done here)
+- M5: web UI, FTS search, JSON API (done)
+- M6: pilot adapters, evaluation set, coverage + runbook (done here)
 - M3: deterministic version comparison
 - M4: structured reports + review queue (LLM optional, never required)
 - M5: web UI + search

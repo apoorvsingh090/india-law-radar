@@ -33,5 +33,10 @@ CLI (argparse) → config.py → logging_config.py → local data dir + sqlite
   loopback default, token-gated POSTs, no tracebacks to clients) →
   `web/pages.py` (escaped templates for dashboard, feed, detail,
   documents, search, sources, review, coverage) + JSON API
-  (`/api/*`, `/health`). `lawradar serve` refuses non-loopback binds
+  (`/api/*`, `/health`).   `lawradar serve` refuses non-loopback binds
   without `--token`.
+- M6 adds: `sources/legislative.py` (same-host listing parser for
+  operator-saved pages) + `sources/egazette.py` (URL builders/validator,
+  no live calls) → `evaluation/runner.py` (7-case bounded set, `lawradar
+  eval`) → `docs/coverage.md` (per-source live findings) +
+  `docs/runbook.md` (failure table, reprocessing recipes).

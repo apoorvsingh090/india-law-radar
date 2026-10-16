@@ -1,7 +1,7 @@
-# India Law Radar — example source registry (Milestone 2).
+# India Law Radar — example source registry (Milestone 6 pilot).
 # Copy to config/sources.yaml to customise (sources.yaml is git-ignored).
 # Real official sources stay disabled until terms + robots + rate limits
-# are verified per docs/source-policy.md.
+# are verified per docs/source-policy.md and docs/coverage.md.
 sources:
   - id: fixture-sample
     name: "[FIXTURE] Labelled demo documents (no legal force)"
@@ -18,7 +18,7 @@ sources:
 
   - id: manual-sample
     name: "Manual import (operator-supplied file)"
-    base_url: https://www.indiacode.nic.in/
+    base_url: https://indiacode.gov.in/
     source_type: legislation_catalogue
     jurisdiction: central
     access_method: manual_import
@@ -26,12 +26,12 @@ sources:
     poll_interval_minutes: 10080
     rate_limit_seconds: 1
     enabled: true
-    coverage_notes: "Usage: lawradar ingest manual-sample --file PATH --title TITLE. Verify India Code terms before any automated access."
+    coverage_notes: "Usage: lawradar ingest manual-sample --file PATH --title TITLE. Operator downloads via permitted means; provenance recorded, never invented."
     storage_policy: unknown
 
   - id: indiacode
     name: "India Code (official legislation catalogue)"
-    base_url: https://www.indiacode.nic.in/
+    base_url: https://indiacode.gov.in/
     source_type: legislation_catalogue
     jurisdiction: central
     access_method: http_poll
@@ -39,5 +39,31 @@ sources:
     poll_interval_minutes: 1440
     rate_limit_seconds: 5
     enabled: false
-    coverage_notes: "NOT VERIFIED: check terms + robots before enabling. M2 http_poll only probes the base URL."
+    coverage_notes: "MIGRATED 2026: www.indiacode.nic.in now redirects to indiacode.gov.in (verified live 2026-10-16). New host flaky from sandbox (/robots.txt HTTP 500, /sitemap.xml timeout). Disabled pending operator verification — see docs/coverage.md."
+    storage_policy: unknown
+
+  - id: legislative-dept
+    name: "Legislative Department (laws, rules, gazette inputs)"
+    base_url: https://www.legislative.gov.in/
+    source_type: legislation_catalogue
+    jurisdiction: central
+    access_method: manual_import
+    terms_review_status: not_reviewed
+    poll_interval_minutes: 1440
+    rate_limit_seconds: 5
+    enabled: false
+    coverage_notes: "Pilot 2026-10-16: /robots.txt is Allow: / but homepage returned HTTP 403 to an automated client; /sitemap.xml serves ministry content, not legislation. Supported path: operator-saved listing pages via sources/legislative.py, or single-file manual import. See docs/coverage.md."
+    storage_policy: unknown
+
+  - id: egazette
+    name: "eGazette (official gazette notifications)"
+    base_url: https://egazette.gov.in/
+    source_type: gazette
+    jurisdiction: central
+    access_method: http_poll
+    terms_review_status: not_reviewed
+    poll_interval_minutes: 1440
+    rate_limit_seconds: 5
+    enabled: false
+    coverage_notes: "NOT REACHABLE from build sandbox (TLS verification failure under proxy; not bypassed). Live robots/terms/structure checks pending operator with direct access. See docs/coverage.md."
     storage_policy: unknown

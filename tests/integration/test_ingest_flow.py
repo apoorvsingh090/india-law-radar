@@ -200,3 +200,33 @@ def test_fixture_ingest_twice_via_cli(tmp_path, monkeypatch, capsys):
         assert count == 2  # two fixture docs, one version each
     finally:
         db.close()
+
+
+def test_manual_url_recorded_as_provenance(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    for var in ("LAWRADAR_CONFIG", "LAWRADAR_DATA_DIR", "LAWRADAR_DB_URL",
+                "LAWRADAR_LOG_LEVEL", "LAWRADAR_LOG_FILE"):
+        monkeypatch.delenv(var, raising=False)
+    data = tmp_path / "data"
+    sources = _sources_yaml(tmp_path, [{
+        "id": "manual-sample", "name": "Manual",
+        "base_url": "https://indiacode.gov.in/",
+        "access_method": "manual_import", "terms_review_status": "not_reviewed",
+        "enabled": True, "rate_limit_seconds": 0,
+    }])
+    target = tmp_path / "act.html"
+    target.write_bytes(V1)
+    url = "https://www.legislative.gov.in/documents/sample-act"
+    args = ["--data-dir", str(data), "ingest", "manual-sample",
+            "--sources-file", sources, "--file", str(target),
+            "--title", "Test Act", "--doc-id", "act-1", "--url", url]
+    assert main(args) == 0
+    db = sqlite3.connect(data / "lawradar.db")
+    try:
+        row = db.execute("SELECT official_url FROM documents").fetchone()
+        assert row[0] == url
+    finally:
+        db.close()
+    # Non-http(s) --url values are rejected, not stored.
+    args[-1] = "ftp://example.invalid/x"
+    assert main(args) == 1

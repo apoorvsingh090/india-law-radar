@@ -216,6 +216,7 @@ def ingest_source(
     manual_file: str | None = None,
     manual_title: str = "",
     manual_doc_id: str = "",
+    manual_url: str = "",
 ) -> dict:
     """Ingest one source; returns a run summary dict (never raises)."""
     run_id = store.create_run(conn, source.id)
@@ -255,10 +256,17 @@ def ingest_source(
                     "(operator downloads via permitted means first)"
                 )
             discovered += 1
+            official_url = (manual_url or "").strip()
+            if official_url:
+                parts = urllib.parse.urlparse(official_url)
+                if parts.scheme not in ("http", "https") or not parts.hostname:
+                    raise ValueError(
+                        f"--url must be an http(s) URL, got {official_url!r}")
             result = ingest_manual_file(
                 conn, config, source, manual_file,
                 title=manual_title or Path(manual_file).name,
                 source_document_id=manual_doc_id,
+                official_url=official_url,
                 document_type="unknown",
             )
             downloaded += 1
@@ -351,6 +359,7 @@ def run_ingestion(
     manual_file: str | None = None,
     manual_title: str = "",
     manual_doc_id: str = "",
+    manual_url: str = "",
 ) -> dict:
     """Entry point for the CLI: sync registry, ingest selected sources."""
     db_path = _db_path(config)
@@ -377,7 +386,7 @@ def run_ingestion(
                 ingest_source(
                     conn, config, source, limit=limit,
                     manual_file=manual_file, manual_title=manual_title,
-                    manual_doc_id=manual_doc_id,
+                    manual_doc_id=manual_doc_id, manual_url=manual_url,
                 )
             )
         return {"sources": [source.id for source in selected],

@@ -80,6 +80,9 @@ def build_parser() -> argparse.ArgumentParser:
                           help="Title for a manual import")
     p_ingest.add_argument("--doc-id", default="",
                           help="Source document id for a manual import")
+    p_ingest.add_argument("--url", default="",
+                          help="Official URL you downloaded --file from "
+                               "(recorded as provenance)")
     p_ingest.add_argument("--sources-file", default=None,
                           help="Alternate sources YAML")
 
@@ -374,6 +377,7 @@ def cmd_ingest(args: argparse.Namespace) -> int:
             manual_file=args.file,
             manual_title=args.title,
             manual_doc_id=args.doc_id,
+            manual_url=args.url,
         )
     except (ValueError, RuntimeError) as exc:
         print(f"ingest failed: {exc}", file=sys.stderr)

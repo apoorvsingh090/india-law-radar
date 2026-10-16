@@ -1,0 +1,11 @@
+# India Law Radar — example local settings (Milestone 1).
+# Copy to config/settings.yaml via `lawradar init` and edit as needed.
+# Environment variables override these values (see .env.example).
+environment: local
+data_dir: ./data
+db_url: sqlite:///./data/lawradar.db
+log_level: INFO
+log_file: ""
+poll_default_minutes: 1440
+http_timeout_seconds: 30
+http_max_bytes: 50000000

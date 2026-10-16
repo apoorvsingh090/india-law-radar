@@ -1,0 +1,15 @@
+# India Law Radar — example source registry (Milestone 2+).
+# Milestone 1 does not poll any source. This file documents the intended
+# shape; adapters arrive in Milestone 2/6 after terms verification.
+sources: []
+# Example entry (NOT active):
+# - id: indiacode
+#   name: India Code
+#   base_url: https://www.indiacode.nic.in/
+#   source_type: legislation_catalogue
+#   jurisdiction: central
+#   access_method: manual_import_first
+#   terms_review_status: not_reviewed
+#   poll_interval_minutes: 1440
+#   enabled: false
+#   coverage_notes: "Verify terms + robots before any automated access."

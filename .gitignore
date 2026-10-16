@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+.venv/
+venv/
+# Test + tooling
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+# Local config / secrets (never commit)
+.env
+config/settings.yaml
+# Local data + corpora (never commit downloaded legal corpora)
+data/*
+!data/.gitkeep
+!data/README.md
+*.db
+*.sqlite
+*.sqlite3
+# Logs + runs
+*.log
+logs/
+# OS / editors
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

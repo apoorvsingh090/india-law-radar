@@ -1,9 +1,11 @@
 # India Law Radar
 
 Source-verifiable monitoring of official Indian legal documents.
-**Milestone 4 (this release):** human review — approval-gated
-publication, citation verification, review audit trail, and an optional
-validated AI summariser (core still needs no model).
+**Milestone 5 (this release):** web interface + full-text search —
+dashboard, filterable change feed, report detail, document pages, FTS5
+search with LIKE fallback, source registry, review queue with web
+approve/reject, coverage disclosure, and a small JSON API. Zero new
+dependencies (stdlib HTTP server).
 
 > Scope honesty: this MVP does **not** claim complete coverage of Indian law,
 > is not a substitute for a qualified advocate, and every future change report
@@ -29,6 +31,12 @@ lawradar health
 
 # 5. Run tests
 pytest
+
+# 6. Start the web UI (loopback only)
+lawradar serve
+# open http://127.0.0.1:8080 — dashboard, changes, report detail,
+# search, sources, review queue, coverage. Use --token for review
+# POSTs if binding beyond loopback (serve refuses otherwise).
 ```
 
 Expected: `lawradar health` prints `health: OK` with three PASS lines;
@@ -89,7 +97,8 @@ data/          local-only runtime data (git-ignored except README/.gitkeep)
 - M1: skeleton, config, logging, CLI health, tests, docs (done)
 - M2: source registry, safe fetcher, hashing/dedup, extraction (done)
 - M3: deterministic diff, change reports with citations (done)
-- M4: review queue, citation checks, optional AI summariser (done here)
+- M4: review queue, citation checks, optional AI summariser (done)
+- M5: web UI, FTS search, JSON API (done here)
 - M3: deterministic version comparison
 - M4: structured reports + review queue (LLM optional, never required)
 - M5: web UI + search

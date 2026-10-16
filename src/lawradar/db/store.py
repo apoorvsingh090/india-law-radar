@@ -381,6 +381,38 @@ def get_report(conn: sqlite3.Connection, report_id: int) -> sqlite3.Row | None:
         (report_id,)).fetchone()
 
 
+def list_reports_filtered(
+    conn: sqlite3.Connection,
+    *,
+    source: str | None = None,
+    jurisdiction: str | None = None,
+    doc_type: str | None = None,
+    verification: str | None = None,
+    limit: int = 100,
+) -> list[sqlite3.Row]:
+    """Change-feed query with optional filters (web UI + API)."""
+    clauses = []
+    params: list = []
+    if source:
+        clauses.append("d.source_id = ?")
+        params.append(source)
+    if jurisdiction:
+        clauses.append("d.jurisdiction = ?")
+        params.append(jurisdiction)
+    if doc_type:
+        clauses.append("d.document_type = ?")
+        params.append(doc_type)
+    if verification:
+        clauses.append("r.verification_status = ?")
+        params.append(verification)
+    where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+    params.append(limit)
+    return list(conn.execute(
+        "SELECT r.*, d.title AS document_title FROM change_reports r "
+        f"JOIN documents d ON d.id=r.document_id {where} "
+        "ORDER BY r.id DESC LIMIT ?", params))
+
+
 def list_citations(conn: sqlite3.Connection,
                    report_id: int) -> list[sqlite3.Row]:
     return list(conn.execute(

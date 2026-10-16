@@ -1,4 +1,4 @@
-"""Command-line interface for India Law Radar (Milestone 4).
+"""Command-line interface for India Law Radar (Milestone 5).
 
 Implemented commands (all functional, no placeholders):
   lawradar init              — create data dir, local settings.yaml, migrate db
@@ -16,6 +16,7 @@ Implemented commands (all functional, no placeholders):
   lawradar reports summarise <id> [--ai] — reword summary (validated)
   lawradar review --list     — pending human-review queue
   lawradar review <id> --approve|--reject|--changes --notes "..."
+  lawradar serve [--host 127.0.0.1] [--port 8080] [--token ...]
 """
 from __future__ import annotations
 
@@ -127,6 +128,14 @@ def build_parser() -> argparse.ArgumentParser:
     p_review.add_argument("--notes", default="",
                           help="Review notes (required to reject/request changes)")
     p_review.add_argument("--limit", type=int, default=50)
+
+    p_serve = sub.add_parser("serve", help="Run the local web interface")
+    p_serve.add_argument("--host", default="127.0.0.1",
+                         help="Bind address (keep 127.0.0.1 unless proxied)")
+    p_serve.add_argument("--port", type=int, default=8080)
+    p_serve.add_argument("--token", default="",
+                         help="Shared secret gating review POSTs (else open "
+                              "on loopback)")
     return parser
 
 
@@ -193,7 +202,7 @@ def cmd_init(args: argparse.Namespace) -> int:
     return 0
 
 
-APP_LABEL = "India Law Radar v0.4.0 (Milestone 4)"
+APP_LABEL = "India Law Radar v0.5.0 (Milestone 5)"
 
 
 def _sqlite_path(db_url: str, data_dir: Path) -> Path | None:
@@ -411,13 +420,15 @@ def cmd_documents(args: argparse.Namespace) -> int:
                           f"extraction={v['extraction_status']} "
                           f"review={v['review_status']} retrieved={v['retrieved_at']}")
         elif args.documents_command == "search":
-            rows = store.search_documents(conn, args.query, args.limit)
+            from lawradar.search import fts as search_fts
+
+            search_fts.ensure_indexed(conn)
+            rows = search_fts.search(conn, args.query, args.limit)
             if args.json:
-                print(json.dumps([dict(r) for r in rows], indent=2))
+                print(json.dumps(rows, indent=2))
             else:
                 for r in rows:
-                    print(f"[{r['id']}] {r['title']} "
-                          f"({r['source_id']}/{r['source_document_id']})")
+                    print(f"[{r['id']}] {r['title']} ({r['engine']})")
                 if not rows:
                     print(f"No matches for {args.query!r}.")
     finally:
@@ -594,6 +605,24 @@ def cmd_review(args: argparse.Namespace) -> int:
         conn.close()
 
 
+def cmd_serve(args: argparse.Namespace) -> int:
+    from lawradar.db import store
+    from lawradar.ingestion.pipeline import _db_path
+    from lawradar.web.server import serve_forever
+
+    config = _effective_config(args)
+    setup_logging(config.log_level, config.log_file)
+    store.init_db(_db_path(config))
+    if args.host not in ("127.0.0.1", "localhost", "::1") and not args.token:
+        print("Refusing to bind a non-loopback address without --token: "
+              "review POSTs would be unprotected. Set --token or use a "
+              "reverse proxy with authentication.", file=sys.stderr)
+        return 2
+    serve_forever(str(_db_path(config)), host=args.host, port=args.port,
+                  token=args.token)
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
@@ -611,6 +640,8 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_reports(args)
     if args.command == "review":
         return cmd_review(args)
+    if args.command == "serve":
+        return cmd_serve(args)
     parser.error(f"unknown command: {args.command}")
     return 2
 

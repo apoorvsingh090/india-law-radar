@@ -19,6 +19,7 @@ from lawradar.db import store
 from lawradar.extraction.text import extract_text
 from lawradar.ingestion.fetcher import FetchError, RateLimiter, fetch_url
 from lawradar.ingestion.hashing import sha256_bytes
+from lawradar.search import fts as search_fts
 from lawradar.sources import fixture as fixture_adapter
 from lawradar.sources.manual import read_manual_file
 from lawradar.sources.registry import SourceRecord, allowed_hosts, load_sources
@@ -124,6 +125,12 @@ def ingest_bytes(
         parser_warnings=warnings,
         review_status=review_status,
     )
+    try:
+        search_fts.index_version(
+            conn, doc_id=document_id, version_id=version_id, title=title,
+            text_path=str(text_file))
+    except Exception as exc:  # noqa: BLE001 — search must never break ingest
+        warnings.append(f"search indexing failed ({exc}); flagged for review")
     row = store.latest_version(conn, document_id)
     # Draft report for the new version. A report failure must never fail
     # the ingest itself — it is recorded as a warning for review.

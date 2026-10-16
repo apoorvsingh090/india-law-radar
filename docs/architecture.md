@@ -27,3 +27,11 @@ CLI (argparse) → config.py → logging_config.py → local data dir + sqlite
   human sign-off) → `ai/` (`HeuristicSummariser` default,
   `CommandSummariser` only with `ai.enabled` + `ai.command`, output
   validated, failures stored in `ai_attempts`).
+- M5 adds: `search/fts.py` (FTS5 `search_fts` mirrored from `search_index`
+  via triggers, LIKE fallback, literalised MATCH input) indexed by the
+  pipeline per version → `web/server.py` (stdlib `ThreadingHTTPServer`,
+  loopback default, token-gated POSTs, no tracebacks to clients) →
+  `web/pages.py` (escaped templates for dashboard, feed, detail,
+  documents, search, sources, review, coverage) + JSON API
+  (`/api/*`, `/health`). `lawradar serve` refuses non-loopback binds
+  without `--token`.

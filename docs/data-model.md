@@ -32,3 +32,8 @@ ingest (one draft per new version; duplicates create nothing) and by
 `change_reports.published_at` is set only by `review --approve`, and
 migration `002` adds `change_reports.ai_attempts` for model-attempt
 history.
+
+**Milestone 5 update:** migration `003` adds `search_index` (one row per
+version: title + extracted body) mirrored into FTS5 `search_fts` by
+triggers. The pipeline indexes each new version; `ensure_indexed`
+backfills pre-M5 databases on first search.

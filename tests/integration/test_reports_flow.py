@@ -73,7 +73,8 @@ def test_reports_end_to_end(tmp_path, monkeypatch, capsys):
         assert any("Section 3" in s for s in affected)
         assert any("Section 4" in s for s in affected)
         citations = store.list_citations(conn, changed["id"])
-        assert len(citations) >= len(changed["diff_text"].splitlines())
+        # One citation per textual change plus source/version citations.
+        assert len(citations) >= len(json.loads(changed["claims_json"])) + 1
         for claim in claims:
             assert claim["citation_ids"]
         assert changed["verification_status"] == "unverified"

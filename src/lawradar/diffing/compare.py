@@ -82,12 +82,12 @@ def compute_diff(old_text: str, new_text: str) -> DiffResult:
     old_lines = (old_text or "").splitlines()
     new_lines = (new_text or "").splitlines()
     unified = "".join(
-        difflib.unified_diff(old_lines, new_lines, "old", "new", lineterm="")
+        difflib.unified_diff(old_lines, new_lines, "old", "new", lineterm="\n")
     )
     old_norm = normalize_text(old_text or "").split(" ")
     new_norm = normalize_text(new_text or "").split(" ")
     normalized_unified = "".join(
-        difflib.unified_diff(old_norm, new_norm, "old", "new", lineterm="")
+        difflib.unified_diff(old_norm, new_norm, "old", "new", lineterm="\n")
     )
     matcher = difflib.SequenceMatcher(a=old_lines, b=new_lines, autojunk=False)
     new_heads = _headings(new_lines)

@@ -24,6 +24,11 @@ anything: sites change.
 - But: homepage returned HTTP 200 once, then **HTTP 403** to the same
   plain-`urllib` client minutes later (bot mitigation), and
   `/sitemap.xml` lists MeitY ministry pages, not legislation.
+- Update 2026-10-16 (later same day): direct `static/uploads/*.pdf`
+  fetches that returned HTTP 200 in the morning now also return
+  **HTTP 403** to the app's identifying User-Agent — no UA rotation or
+  retry escalation attempted. Automated fetching is not viable from
+  here, period.
 - Conclusion: polite listing fetches are unreliable from automation
   here. Supported paths: (1) operator saves a listing page in a browser
   and `discover_from_listing_html` (`src/lawradar/sources/legislative.py`)

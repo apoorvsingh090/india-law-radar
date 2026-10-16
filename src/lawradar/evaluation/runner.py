@@ -159,7 +159,7 @@ def run() -> EvalResult:
             else:
                 if case["expect_change"] == "unknown":
                     report = store.list_reports(conn,
-                                                document_id=v1.document_id)[-1]
+                                                document_id=v1.document_id)[0]
                     tasks = [t for t in store.list_review_tasks(conn)
                              if t["change_report_id"] == report["id"]]
                     outcome["pass"] = (
@@ -168,7 +168,7 @@ def run() -> EvalResult:
                         and len(tasks) >= 1)
                 elif case["expect_change"] == "new_document":
                     report = store.list_reports(conn,
-                                                document_id=v1.document_id)[-1]
+                                                document_id=v1.document_id)[0]
                     # Commencement honesty is schema-enforced (build_report
                     # always emits unverified/None); here we check the type.
                     outcome["pass"] = report["change_type"] == "new_document"

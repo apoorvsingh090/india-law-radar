@@ -10,6 +10,7 @@ LISTING = """
 <li><a href="https://evil.invalid/stolen.pdf">Not an official document</a></li>
 <li><a href="mailto:info@example.invalid">Contact</a></li>
 <li><a href="/rules-2026">The Sample Rules, 2026</a></li>
+<li><a href="/sites/default/files/data-2026.xlsx">Dataset 2026 (not a document)</a></li>
 </ul></body></html>
 """
 
@@ -24,6 +25,9 @@ def test_listing_parser_finds_official_docs():
     kinds = {e.url: e.kind for e in result.entries}
     assert kinds["https://www.legislative.gov.in/sites/default/files/"
                  "sample-act-2026.pdf"] == "pdf"
+    assert kinds["https://www.legislative.gov.in/rules-2026"] == "html"
+    assert kinds["https://www.legislative.gov.in/sites/default/files/"
+                 "data-2026.xlsx"] == "unknown"
     assert any(e.act_hint for e in result.entries)
 
 

@@ -21,7 +21,7 @@ DOC = {
     "title": "Test Act",
     "issuing_authority": "Test Authority",
     "jurisdiction": "central",
-    "official_url": "https://www.indiacode.nic.in/test",
+    "official_url": "https://indiacode.gov.in/test",
 }
 V1 = b"<html><body><h1>Test Act</h1><p>File within thirty days.</p></body></html>"
 V2 = (b"<html><body><h1>Test Act</h1><p>File within forty-five days.</p>"
@@ -42,7 +42,7 @@ def isolated(tmp_path, monkeypatch):
     conn = store.connect(db_path)
     from lawradar.sources.registry import SourceRecord
     store.upsert_source(conn, SourceRecord(
-        id="manual-sample", name="Manual", base_url="https://www.indiacode.nic.in/",
+        id="manual-sample", name="Manual", base_url="https://indiacode.gov.in/",
         access_method="manual_import", enabled=True))
     conn.commit()
     yield config, conn

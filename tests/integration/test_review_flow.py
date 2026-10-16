@@ -25,7 +25,7 @@ V2 = (b"<html><body><h1>Review Act</h1>"
       b"</body></html>")
 
 MANUAL = {
-    "id": "m", "name": "M", "base_url": "https://www.indiacode.nic.in/",
+    "id": "m", "name": "M", "base_url": "https://indiacode.gov.in/",
     "access_method": "manual_import", "terms_review_status": "not_reviewed",
     "enabled": True, "rate_limit_seconds": 0,
 }

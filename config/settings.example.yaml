@@ -19,3 +19,6 @@ review_policy: manual
 # malformed output or invented citations are rejected, never repaired.
 ai_enabled: false
 ai_command: ""
+# Public-beta guards (Milestone 7): max state-changing POSTs per client IP
+# per minute. `serve` still refuses non-loopback binds without --token.
+post_limit_per_minute: 30

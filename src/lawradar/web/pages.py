@@ -47,6 +47,7 @@ def layout(title: str, body: str) -> str:
         "<a href=\"/\">Dashboard</a><a href=\"/changes\">Changes</a>"
         "<a href=\"/search\">Search</a><a href=\"/sources\">Sources</a>"
         "<a href=\"/review\">Review</a><a href=\"/coverage\">Coverage</a>"
+        "<a href=\"/feedback\">Feedback</a><a href=\"/privacy\">Privacy</a>"
         "</nav></header><main>"
         f"<h2>{esc(title)}</h2>{body}</main>"
         "<footer>India Law Radar MVP — source-verifiable drafts, not legal "
@@ -276,12 +277,64 @@ def coverage_page(ctx: dict) -> str:
         "<h3>Limitations</h3><p>No claim of completeness or currency. "
         "Presence in this database does not mean a provision is in force. "
         "This tool is not a substitute for a qualified advocate.</p>"
-        "<h3>Report an error</h3><p>File an issue with the source URL and "
-        "retrieval timestamp shown on the report page.</p>")
+        "<h3>Report an error</h3><p>Use <a href=\"/feedback\">Feedback</a> "
+        "with the source URL and retrieval timestamp shown on the report "
+        "page.</p>")
 
 
 def not_found(path: str) -> str:
     return f"<p>No page for {esc(path)}. <a href=\"/\">Back to dashboard</a>.</p>"
+
+
+def feedback_page(report_id: str = "", token: str = "") -> str:
+    token_field = (f"<input type=\"hidden\" name=\"token\" value=\"{esc(token)}\">"
+                   if token else "")
+    return (
+        "<p>Found a wrong title, date, citation, or link? Tell us — error "
+        "reports linked to a report automatically join the human review "
+        "queue.</p>"
+        f"<form method=\"post\" action=\"/feedback\">{token_field}"
+        f"<label>Report id (optional) <input name=\"report_id\" "
+        f"value=\"{esc(report_id)}\"></label><br>"
+        "<label>Contact (optional) <input name=\"contact\"></label><br>"
+        "<label>What is wrong?<br><textarea name=\"message\" rows=\"5\" "
+        "cols=\"60\" required></textarea></label><br>"
+        "<button type=\"submit\">Send feedback</button></form>")
+
+
+def privacy_page() -> str:
+    return (
+        "<h3>What we collect</h3>"
+        "<p>Nothing by default. No accounts, no analytics, no trackers, no "
+        "cookies. The web UI serves pages; it does not phone home.</p>"
+        "<h3>What operators store</h3>"
+        "<p>Official legal documents the operator ingests (URL, retrieval "
+        "time, hash, text), derived reports, review decisions, and any "
+        "feedback visitors submit (message + optional contact). All of it "
+        "lives in the operator's local SQLite file — see "
+        "<a href=\"/coverage\">Coverage</a> for what is monitored.</p>"
+        "<h3>What we never do</h3>"
+        "<p>No personal data is required to read anything. Do not submit "
+        "client confidences or personal documents through the feedback form. "
+        "Before adding accounts or uploads, review applicable privacy and "
+        "data-protection requirements.</p>")
+
+
+def limitations_page() -> str:
+    return (
+        "<h3>Coverage</h3><p>Only the sources listed under "
+        "<a href=\"/sources\">Sources</a> are monitored, and only from the "
+        "dates actually ingested. This database is not complete and is "
+        "never claimed to be current.</p>"
+        "<h3>Status</h3><p>Presence here does not mean a provision is in "
+        "force. Publication, commencement, and applicability are different "
+        "dates; anything not evidenced is shown as unverified or unknown.</p>"
+        "<h3>Machine output</h3><p>Draft summaries are labelled as drafts. "
+        "Unpublished reports are not legal conclusions. Nothing here is a "
+        "substitute for a qualified advocate.</p>"
+        "<h3>Corrections</h3><p>Use <a href=\"/feedback\">Feedback</a> to "
+        "report an error; corrections are reviewed against the official "
+        "source with full history preserved.</p>")
 
 
 def review_result(report_id: int, outcome: dict) -> str:

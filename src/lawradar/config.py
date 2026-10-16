@@ -29,6 +29,7 @@ DEFAULTS: dict = {
     "review_policy": "manual",
     "ai_enabled": False,
     "ai_command": "",
+    "post_limit_per_minute": 30,
 }
 
 ENV_MAP = {
@@ -40,6 +41,7 @@ ENV_MAP = {
     "LAWRADAR_REVIEW_POLICY": "review_policy",
     "LAWRADAR_AI_ENABLED": "ai_enabled",
     "LAWRADAR_AI_COMMAND": "ai_command",
+    "LAWRADAR_POST_LIMIT_PER_MINUTE": "post_limit_per_minute",
     "LAWRADAR_CONFIG": None,  # path to config file itself, handled separately
 }
 
@@ -57,6 +59,7 @@ class AppConfig:
     review_policy: str = "manual"
     ai_enabled: bool = False
     ai_command: str = ""
+    post_limit_per_minute: int = 30
     config_path: str = ""
     extra: dict = field(default_factory=dict)
 
@@ -73,6 +76,7 @@ class AppConfig:
             "review_policy": self.review_policy,
             "ai_enabled": self.ai_enabled,
             "ai_command": self.ai_command,
+            "post_limit_per_minute": self.post_limit_per_minute,
         }
 
 
@@ -122,7 +126,8 @@ def load_settings(explicit: str | None = None) -> AppConfig:
         if raw:
             merged[key] = raw
     # Coerce numeric fields that may arrive as strings from env vars.
-    for int_key in ("poll_default_minutes", "http_timeout_seconds", "http_max_bytes"):
+    for int_key in ("poll_default_minutes", "http_timeout_seconds",
+                      "http_max_bytes", "post_limit_per_minute"):
         try:
             merged[int_key] = int(merged[int_key])
         except (TypeError, ValueError) as exc:

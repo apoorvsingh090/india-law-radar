@@ -521,6 +521,43 @@ def set_ai_attempts(
     )
 
 
+# -- user feedback (M7) ------------------------------------------------------
+
+def add_feedback(
+    conn: sqlite3.Connection, *, change_report_id: int | None, contact: str,
+    message: str,
+) -> int:
+    message = (message or "").strip()
+    if not message:
+        raise ValueError("feedback message must not be empty")
+    if len(message) > 4000:
+        raise ValueError("feedback message too long (max 4000 characters)")
+    cursor = conn.execute(
+        "INSERT INTO feedback (change_report_id, contact, message) "
+        "VALUES (?, ?, ?)",
+        (change_report_id, (contact or "").strip()[:200], message),
+    )
+    return int(cursor.lastrowid)
+
+
+def list_feedback(
+    conn: sqlite3.Connection, status: str | None = None, limit: int = 100
+) -> list[sqlite3.Row]:
+    if status is None:
+        return list(conn.execute(
+            "SELECT * FROM feedback ORDER BY id DESC LIMIT ?", (limit,)))
+    return list(conn.execute(
+        "SELECT * FROM feedback WHERE status=? ORDER BY id DESC LIMIT ?",
+        (status, limit)))
+
+
+def resolve_feedback(conn: sqlite3.Connection, feedback_id: int) -> None:
+    conn.execute(
+        "UPDATE feedback SET status='resolved', "
+        "resolved_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id=?",
+        (feedback_id,))
+
+
 def update_report_summary(
     conn: sqlite3.Connection,
     report_id: int,

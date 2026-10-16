@@ -40,3 +40,8 @@ CLI (argparse) → config.py → logging_config.py → local data dir + sqlite
   no live calls) → `evaluation/runner.py` (7-case bounded set, `lawradar
   eval`) → `docs/coverage.md` (per-source live findings) +
   `docs/runbook.md` (failure table, reprocessing recipes).
+- M7 adds: per-IP POST rate limiting + security headers + `--token`
+  gating in `web/server.py`, `feedback` table (migration `004`) with
+  `/feedback` intake auto-opening review tasks and `feedback` CLI
+  triage, `/privacy` + `/limitations` pages, `docs/deployment.md` +
+  `docs/feedback.md`.

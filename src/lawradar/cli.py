@@ -1,4 +1,4 @@
-"""Command-line interface for India Law Radar (Milestone 6).
+"""Command-line interface for India Law Radar (Milestone 7).
 
 Implemented commands (all functional, no placeholders):
   lawradar init              — create data dir, local settings.yaml, migrate db
@@ -18,6 +18,7 @@ Implemented commands (all functional, no placeholders):
   lawradar review <id> --approve|--reject|--changes --notes "..."
   lawradar serve [--host 127.0.0.1] [--port 8080] [--token ...]
   lawradar eval                run the curated pilot evaluation set
+  lawradar feedback list       triage user error reports
 """
 from __future__ import annotations
 
@@ -139,6 +140,15 @@ def build_parser() -> argparse.ArgumentParser:
                               "on loopback)")
 
     sub.add_parser("eval", help="Run the curated pilot evaluation set")
+
+    p_feedback = sub.add_parser("feedback", help="Triage user error reports")
+    feedback_sub = p_feedback.add_subparsers(dest="feedback_command",
+                                             required=True)
+    p_flist = feedback_sub.add_parser("list", help="List feedback")
+    p_flist.add_argument("--status", default=None)
+    p_flist.add_argument("--limit", type=int, default=50)
+    p_fresolve = feedback_sub.add_parser("resolve", help="Mark resolved")
+    p_fresolve.add_argument("feedback_id", type=int)
     return parser
 
 
@@ -205,7 +215,7 @@ def cmd_init(args: argparse.Namespace) -> int:
     return 0
 
 
-APP_LABEL = "India Law Radar v0.6.0 (Milestone 6)"
+APP_LABEL = "India Law Radar v0.7.0 (Milestone 7)"
 
 
 def _sqlite_path(db_url: str, data_dir: Path) -> Path | None:
@@ -622,7 +632,8 @@ def cmd_serve(args: argparse.Namespace) -> int:
               "reverse proxy with authentication.", file=sys.stderr)
         return 2
     serve_forever(str(_db_path(config)), host=args.host, port=args.port,
-                  token=args.token)
+                  token=args.token,
+                  post_limit_per_minute=config.post_limit_per_minute)
     return 0
 
 
@@ -648,6 +659,36 @@ def cmd_eval(args: argparse.Namespace) -> int:
     return 0 if result.metrics["cases_passed"] == result.metrics["cases"] else 1
 
 
+def cmd_feedback(args: argparse.Namespace) -> int:
+    from lawradar.db import store
+    from lawradar.ingestion.pipeline import _db_path
+
+    config = _effective_config(args)
+    setup_logging(config.log_level, config.log_file)
+    store.init_db(_db_path(config))
+    conn = store.connect(_db_path(config))
+    try:
+        if args.feedback_command == "list":
+            rows = store.list_feedback(conn, args.status, args.limit)
+            if args.json:
+                print(json.dumps([dict(r) for r in rows], indent=2,
+                                 default=str))
+            else:
+                for row in rows:
+                    print(f"[{row['id']}] report={row['change_report_id']} "
+                          f"status={row['status']} "
+                          f"{row['message'][:120]}")
+                if not rows:
+                    print("No feedback yet.")
+        elif args.feedback_command == "resolve":
+            store.resolve_feedback(conn, args.feedback_id)
+            conn.commit()
+            print(f"feedback {args.feedback_id} resolved")
+    finally:
+        conn.close()
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
@@ -669,6 +710,8 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_serve(args)
     if args.command == "eval":
         return cmd_eval(args)
+    if args.command == "feedback":
+        return cmd_feedback(args)
     parser.error(f"unknown command: {args.command}")
     return 2
 

@@ -1,15 +1,17 @@
-"""Stdlib web server (Milestone 5): no new dependencies.
+"""Stdlib web server (Milestone 7): no new dependencies.
 
 Serves the dashboard, change feed, report detail, search, source
-registry, review queue, and coverage pages plus a small JSON API.
-State-changing POSTs are same-origin forms; bind defaults to loopback,
-and an optional shared-secret token gates POSTs when set.
+registry, review queue, coverage/privacy/limitations pages, feedback
+form, plus a small JSON API. State-changing POSTs are same-origin forms
+gated by an optional shared-secret token and a per-IP rate limit; bind
+defaults to loopback and non-loopback binds require --token.
 """
 from __future__ import annotations
 
 import hmac
 import json
 import re
+import time
 import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
@@ -19,9 +21,34 @@ from lawradar.web import pages
 
 MAX_POST_BYTES = 1_000_000
 
+SECURITY_HEADERS = {
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+    "Referrer-Policy": "no-referrer",
+    "Content-Security-Policy": "default-src 'self'; style-src 'unsafe-inline'",
+}
+
+
+class RateLimiter:
+    """Fixed-window per-IP counter for state-changing requests."""
+
+    def __init__(self, max_per_minute: int = 30) -> None:
+        self.max_per_minute = max(1, max_per_minute)
+        self._hits: dict[str, list[float]] = {}
+
+    def allow(self, ip: str, now: float | None = None) -> bool:
+        moment = now if now is not None else time.monotonic()
+        window = [t for t in self._hits.get(ip, []) if moment - t < 60.0]
+        if len(window) >= self.max_per_minute:
+            self._hits[ip] = window
+            return False
+        window.append(moment)
+        self._hits[ip] = window
+        return True
+
 
 class Handler(BaseHTTPRequestHandler):
-    server_version = "IndiaLawRadar/0.5.0"
+    server_version = "IndiaLawRadar/0.7.0"
 
     # -- helpers ---------------------------------------------------------
     def _db(self):
@@ -35,6 +62,8 @@ class Handler(BaseHTTPRequestHandler):
         self.send_response(code)
         self.send_header("Content-Type", ctype)
         self.send_header("Content-Length", str(len(data)))
+        for key, value in SECURITY_HEADERS.items():
+            self.send_header(key, value)
         for key, value in (headers or {}).items():
             self.send_header(key, value)
         self.end_headers()
@@ -78,8 +107,17 @@ class Handler(BaseHTTPRequestHandler):
                                                  self._token_value(query)))
                 elif path == "/coverage":
                     self._coverage(conn)
+                elif path == "/privacy":
+                    self._page("Privacy", pages.privacy_page())
+                elif path == "/limitations":
+                    self._page("Limitations", pages.limitations_page())
+                elif path == "/feedback":
+                    self._page("Report an error",
+                               pages.feedback_page(
+                                   report_id=query.get("report", [""])[0],
+                                   token=self._token_value(query)))
                 elif path == "/health":
-                    self._json({"status": "ok", "version": "0.5.0"})
+                    self._json({"status": "ok", "version": "0.7.0"})
                 elif path == "/api/sources":
                     self._json([dict(r) for r in store.list_sources(conn)])
                 elif path == "/api/reports":
@@ -236,24 +274,51 @@ class Handler(BaseHTTPRequestHandler):
             "gaps": gaps}))
 
     # -- POST ------------------------------------------------------------
+    def _client_ip(self) -> str:
+        return self.client_address[0] if self.client_address else "?"
+
+    def _check_rate_limit(self) -> bool:
+        limiter = getattr(self.server, "rate_limiter", None)
+        if limiter is None:
+            return True
+        return limiter.allow(self._client_ip())
+
+    def _read_form(self):
+        length = int(self.headers.get("Content-Length") or 0)
+        if length > MAX_POST_BYTES:
+            self._page("Error", "<p>Form too large.</p>", 413)
+            return None
+        body = self.rfile.read(length).decode("utf-8", "replace")
+        return urllib.parse.parse_qs(body)
+
+    def _check_token(self, form: dict) -> bool:
+        token = getattr(self.server, "token", "")
+        if token and not hmac.compare_digest(
+                form.get("token", [""])[0], token):
+            self._page("Forbidden",
+                       "<p>Missing or invalid review token.</p>", 403)
+            return False
+        return True
+
     def do_POST(self) -> None:  # noqa: N802
         try:
             parsed = urllib.parse.urlparse(self.path)
-            match = re.fullmatch(r"/reports/(\d+)/review", parsed.path)
-            if not match:
+            review_match = re.fullmatch(r"/reports/(\d+)/review", parsed.path)
+            if parsed.path == "/feedback":
+                self._post_feedback()
+                return
+            if not review_match:
                 self._page("Not found", pages.not_found(parsed.path), 404)
                 return
-            length = int(self.headers.get("Content-Length") or 0)
-            if length > MAX_POST_BYTES:
-                self._page("Error", "<p>Form too large.</p>", 413)
+            if not self._check_rate_limit():
+                self._page("Too many requests",
+                           "<p>Rate limit exceeded. Wait a minute and retry.</p>",
+                           429)
                 return
-            body = self.rfile.read(length).decode("utf-8", "replace")
-            form = urllib.parse.parse_qs(body)
-            token = getattr(self.server, "token", "")
-            if token and not hmac.compare_digest(
-                    form.get("token", [""])[0], token):
-                self._page("Forbidden",
-                           "<p>Missing or invalid review token.</p>", 403)
+            form = self._read_form()
+            if form is None:
+                return
+            if not self._check_token(form):
                 return
             decision = form.get("decision", [""])[0]
             mapping = {"approved": "approved", "rejected": "rejected",
@@ -265,10 +330,11 @@ class Handler(BaseHTTPRequestHandler):
             from lawradar.review.queue import resolve
 
             conn = self._db()
+            report_id = int(review_match.group(1))
             try:
                 try:
-                    outcome = resolve(
-                        conn, report_id=int(match.group(1)),
+                    resolve(
+                        conn, report_id=report_id,
                         decision=mapping[decision],
                         reviewer=form.get("reviewer", [""])[0],
                         notes=form.get("notes", [""])[0])
@@ -276,12 +342,12 @@ class Handler(BaseHTTPRequestHandler):
                     conn.close()
                     self._page("Review refused",
                                f"<p>{pages.esc(str(exc)[:300])}</p>"
-                               f"<p><a href=\"/reports/{match.group(1)}\">"
+                               f"<p><a href=\"/reports/{report_id}\">"
                                f"Back to report</a>.</p>", 400)
                     return
             finally:
                 conn.close()
-            self._redirect(f"/reports/{match.group(1)}")
+            self._redirect(f"/reports/{report_id}")
         except BrokenPipeError:
             pass
         except Exception as exc:  # noqa: BLE001
@@ -289,21 +355,74 @@ class Handler(BaseHTTPRequestHandler):
                        f"<p class=\"badge bad\">Something went wrong: "
                        f"{pages.esc(str(exc)[:200])}</p>", 500)
 
+    def _post_feedback(self) -> None:
+        """Accept an error report; link it to a report when given."""
+        if not self._check_rate_limit():
+            self._page("Too many requests",
+                       "<p>Rate limit exceeded. Wait a minute and retry.</p>",
+                       429)
+            return
+        form = self._read_form()
+        if form is None:
+            return
+        if not self._check_token(form):
+            return
+        raw_report = form.get("report_id", [""])[0].strip()
+        try:
+            report_id = int(raw_report) if raw_report else None
+        except (TypeError, ValueError):
+            self._page("Error", "<p>Report id must be a number.</p>", 400)
+            return
+        message = form.get("message", [""])[0]
+        contact = form.get("contact", [""])[0]
+        conn = self._db()
+        try:
+            if report_id is not None and store.get_report(conn, report_id) is None:
+                self._page("Error",
+                            f"<p>No report {pages.esc(raw_report)}.</p>", 400)
+                return
+            feedback_id = store.add_feedback(
+                conn, change_report_id=report_id, contact=contact,
+                message=message)
+            if report_id is not None:
+                from lawradar.review.queue import ensure_task
+
+                report = store.get_report(conn, report_id)
+                ensure_task(
+                    conn, report_id=report_id,
+                    document_version_id=report["new_version_id"],
+                    reason=f"user-reported error (feedback #{feedback_id}): "
+                           f"{message[:200]}",
+                    severity="medium")
+            conn.commit()
+        except ValueError as exc:
+            self._page("Error", f"<p>{pages.esc(str(exc)[:300])}</p>", 400)
+            return
+        finally:
+            conn.close()
+        self._page("Thank you",
+                   f"<p>Feedback #{feedback_id} recorded. A maintainer "
+                   f"reviews error reports against the official source.</p>"
+                   f"<p><a href=\"/\">Back to dashboard</a>.</p>")
+
 
 def build_server(db_path: str = "data/lawradar.db", host: str = "127.0.0.1",
-                 port: int = 8080, token: str = "") -> ThreadingHTTPServer:
+                 port: int = 8080, token: str = "",
+                 post_limit_per_minute: int = 30) -> ThreadingHTTPServer:
     """Create (but do not start) the web server."""
     server = ThreadingHTTPServer((host, port), Handler)
     server.db_path = db_path
     server.token = token or ""
+    server.rate_limiter = RateLimiter(post_limit_per_minute)
     server.daemon_threads = True
     return server
 
 
 def serve_forever(db_path: str = "data/lawradar.db", host: str = "127.0.0.1",
-                  port: int = 8080, token: str = "") -> None:
+                  port: int = 8080, token: str = "",
+                  post_limit_per_minute: int = 30) -> None:
     """Block serving until interrupted."""
-    server = build_server(db_path, host, port, token)
+    server = build_server(db_path, host, port, token, post_limit_per_minute)
     address = f"http://{server.server_address[0]}:{server.server_address[1]}"
     print(f"Serving {pages.APP_TITLE} at {address} (Ctrl-C to stop)")
     try:

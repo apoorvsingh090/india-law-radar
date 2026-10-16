@@ -26,8 +26,18 @@ def _version_text(conn, version_id: int) -> str:
 
 
 def verify_citation(citation: dict, *, official_url: str,
-                    version_text: str) -> dict:
-    """Check one citation. Returns ``{'ok': bool, 'reasons': [...]}``."""
+                    version_text: str, title: str = "") -> dict:
+    """Check one citation. Returns ``{'ok': bool, 'reasons': [...]}``.
+
+    Deliberate trust boundaries (fail-closed):
+    - ``text span`` quotes are checked against the extracted version text
+      on the same normalised basis used at creation — regardless of
+      length. No text to check against, or no quote, is a failure, not
+      a pass.
+    - ``URL`` citations attest document-level provenance: the quote must
+      match the document title or URL, else the extracted text.
+    - A citation whose source URL names a different official URL fails.
+    """
     reasons: list[str] = []
     locator = (citation.get("locator_value") or "").strip()
     if not locator:
@@ -35,15 +45,31 @@ def verify_citation(citation: dict, *, official_url: str,
     if not (citation.get("locator_type") or "").strip():
         reasons.append("empty locator type")
     quoted = (citation.get("quoted_text") or "").strip()
-    if quoted and version_text:
-        # Quotes are whitespace-collapsed (and possibly truncated) at
-        # creation; compare on the same normalised basis.
-        marker = " …[truncated]"
-        candidate = quoted[:-len(marker)] if quoted.endswith(marker) else quoted
-        if (citation.get("locator_type") == "text span"
-                and len(candidate) > 20
-                and normalize_text(candidate) not in normalize_text(version_text)):
+    marker = " …[truncated]"
+    candidate = quoted[:-len(marker)] if quoted.endswith(marker) else quoted
+    loc_type = (citation.get("locator_type") or "").strip()
+    if loc_type == "text span":
+        if not candidate:
+            reasons.append("empty quoted text")
+        elif not version_text:
+            reasons.append("no extracted text available to check against")
+        elif normalize_text(candidate) not in normalize_text(version_text):
             reasons.append("quoted text not found in extracted version text")
+    elif loc_type == "URL":
+        if not candidate and not locator:
+            reasons.append("empty quote and locator")
+        elif candidate and (candidate != title and candidate != official_url
+                            and normalize_text(candidate)
+                            not in normalize_text(version_text or title)):
+            reasons.append("quoted text matches neither the document title, "
+                           "the official URL, nor the extracted text")
+    elif candidate and version_text:
+        if normalize_text(candidate) not in normalize_text(version_text):
+            reasons.append("quoted text not found in extracted version text")
+    url = (citation.get("source_url") or "").strip()
+    if url and official_url and url != official_url:
+        reasons.append(f"source URL differs from official URL {official_url!r}")
+    return {"ok": not reasons, "reasons": reasons}
     url = (citation.get("source_url") or "").strip()
     if url and official_url and url != official_url:
         reasons.append(f"source URL differs from official URL {official_url!r}")
@@ -57,6 +83,7 @@ def verify_report(conn, report_id: int) -> dict:
         raise ValueError(f"unknown report id {report_id}")
     document = store.get_document(conn, report["document_id"])
     official_url = (document["official_url"] if document else "") or ""
+    title = (document["title"] if document else "") or ""
     version_text = _version_text(conn, report["new_version_id"])
     citations = store.list_citations(conn, report_id)
     results: list[dict] = []
@@ -64,7 +91,7 @@ def verify_report(conn, report_id: int) -> dict:
     for citation in citations:
         outcome = verify_citation(
             dict(citation), official_url=official_url,
-            version_text=version_text)
+            version_text=version_text, title=title)
         status = "verified" if outcome["ok"] else "failed"
         if not outcome["ok"]:
             failures += 1

@@ -84,9 +84,14 @@ class Handler(BaseHTTPRequestHandler):
                     self._json([dict(r) for r in store.list_sources(conn)])
                 elif path == "/api/reports":
                     doc = query.get("document", [None])[0]
-                    rows = store.list_reports(
-                        conn, limit=50,
-                        document_id=int(doc) if doc else None)
+                    try:
+                        doc_id = int(doc) if doc else None
+                    except (TypeError, ValueError):
+                        self._json({"error": "document must be an integer"},
+                                   400)
+                        return
+                    rows = store.list_reports(conn, limit=50,
+                                              document_id=doc_id)
                     self._json([dict(r) for r in rows])
                 elif path == "/api/search":
                     self._json(search_fts.search(
@@ -173,10 +178,12 @@ class Handler(BaseHTTPRequestHandler):
                     store.list_versions(conn, report["document_id"])]
         citations = [dict(c) for c in
                      store.list_citations(conn, report_id)]
+        document = store.get_document(conn, report["document_id"])
         from lawradar.review.queue import audit_trail
 
         self._page(f"Report {report_id}",
-                   pages.report_detail(report, versions, citations,
+                   pages.report_detail(report, dict(document) if document else {},
+                                        versions, citations,
                                         audit_trail(conn, report_id),
                                         self._token_value(query)))
 

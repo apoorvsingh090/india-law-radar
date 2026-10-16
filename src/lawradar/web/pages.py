@@ -113,13 +113,15 @@ def changes_feed(reports: list[dict], filters: dict,
         f"retrieved {esc(r['retrieved_at'] or 'unknown')} · "
         f"{esc(r['verification_status'])}"
         + (" · published" if r["published_at"] else " · unpublished")
-        + f"<br><a href=\"{esc(r['official_url'])}\">official source</a></li>"
+        + f"<br>{esc((r['summary'] or '')[:300])}<br>"
+        f"<a href=\"{esc(r['official_url'])}\">official source</a></li>"
         for r in reports) or "<li>No changes match.</li>"
     return form + "<ul>" + items + "</ul>"
 
 
-def report_detail(report: dict, versions: list[dict], citations: list[dict],
-                  trail: list[dict], token: str = "") -> str:
+def report_detail(report: dict, document: dict, versions: list[dict],
+                   citations: list[dict], trail: list[dict],
+                   token: str = "") -> str:
     claims = json.loads(report["claims_json"])
     affected = json.loads(report["affected_sections"])
     versions_html = "".join(
@@ -151,12 +153,32 @@ def report_detail(report: dict, versions: list[dict], citations: list[dict],
         "<button name=\"decision\" value=\"rejected\" type=\"submit\">Reject</button> "
         "<button name=\"decision\" value=\"needs_changes\" type=\"submit\">"
         "Request changes</button></form>")
+    warnings: list[str] = []
+    for version in versions:
+        try:
+            parsed = json.loads(version.get("parser_warnings") or "[]")
+        except (ValueError, TypeError):
+            parsed = ["unparseable parser warnings"]
+        warnings.extend(str(w) for w in parsed)
+    warnings_html = ("<ul>" + "".join(f"<li>{esc(w)}</li>" for w in warnings)
+                     + "</ul>" if warnings else "<p>No warnings.</p>")
     return (
         f"<p><span class=\"badge\">{esc(report['change_type'])}</span> "
         f"{esc(report['verification_status'])} · "
         f"{'published ' + esc(report['published_at']) if report['published_at'] else 'unpublished'}</p>"
+        f"<p><b>Document:</b> {esc(document.get('title', ''))} · "
+        f"{esc(document.get('document_type', ''))} · "
+        f"{esc(document.get('jurisdiction', ''))} · "
+        f"{esc(document.get('issuing_authority', '') or 'unknown authority')}</p>"
+        f"<p><b>Official source:</b> "
+        f"<a href=\"{esc(document.get('official_url', ''))}\">"
+        f"{esc(document.get('official_url', '') or 'not recorded')}</a> · "
+        f"<b>Published:</b> unknown (never inferred)</p>"
         f"<p>{esc(report['summary'])}</p>"
         + (f"<p><b>Affected:</b> {esc(', '.join(affected))}</p>" if affected else "")
+        + "<p><b>Commencement:</b> Not established from the extracted "
+        "evidence (unverified).</p>"
+        + "<h3>Warnings</h3>" + warnings_html
         + "<h3>Versions</h3><table><tr><th>Version</th><th>SHA</th>"
         "<th>Extraction</th><th>Review</th><th>Retrieved</th></tr>"
         + versions_html + "</table>"
@@ -230,7 +252,8 @@ def review_page(tasks: list[dict], token: str = "") -> str:
         "<input type=\"hidden\" name=\"reviewer\" value=\"web\">"
         "<input name=\"notes\" placeholder=\"notes (required to reject)\"> "
         "<button name=\"decision\" value=\"approved\">Approve</button> "
-        "<button name=\"decision\" value=\"rejected\">Reject</button>"
+        "<button name=\"decision\" value=\"rejected\">Reject</button> "
+        "<button name=\"decision\" value=\"needs_changes\">Request changes</button>"
         "</form></li>"
         for t in tasks) or "<li>Queue is empty. Nothing needs review.</li>"
     return "<ul>" + items + "</ul>"

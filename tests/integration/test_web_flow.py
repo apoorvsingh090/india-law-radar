@@ -111,6 +111,46 @@ def test_pages_and_api(live):
     assert "fully up to date" not in _get(base, "/")[1].lower()
 
 
+def test_feed_shows_summaries(live):
+    base, _ = live
+    _, body = _get(base, "/changes")
+    assert "Draft explanation" in body
+
+
+def test_report_detail_shows_provenance(live):
+    base, _ = live
+    _, body = _get(base, "/reports/1")
+    assert "Official source" in body
+    assert "Commencement" in body
+    assert "Not established" in body
+    assert "Warnings" in body
+
+
+def test_review_queue_has_changes_button(live):
+    import json as _json
+
+    base, tmp_path = live
+    status, body = _get(base, "/api/reports")
+    rid = _json.loads(body)[0]["id"]
+    conn = store.connect(tmp_path / "data" / "lawradar.db")
+    try:
+        store.create_review_task(conn, document_version_id=None,
+                                 change_report_id=rid,
+                                 reason="test queue rendering")
+        conn.commit()
+    finally:
+        conn.close()
+    _, body = _get(base, "/review")
+    assert "Request changes" in body
+
+
+def test_api_bad_document_param_400(live):
+    base, _ = live
+    status, body = _get(base, "/api/reports?document=abc")
+    assert status == 400
+    assert "integer" in body
+
+
 def test_api_shapes(live):
     base, _ = live
     status, body = _get(base, "/api/reports")

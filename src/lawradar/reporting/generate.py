@@ -166,7 +166,8 @@ def build_report(
         "related_documents": [],
         "claims": claims,
         "citations": citations,
-        "warnings": warnings + json.loads(new_version.get("parser_warnings",
+        "diff_unified": diff.unified if diff is not None else "",
+        "diff_normalized": diff.normalized_unified if diff is not None else "",        "warnings": warnings + json.loads(new_version.get("parser_warnings",
                                                           "[]")),
         "review_status": ("needs_changes"
                           if new_version.get("review_status") == "needs_review"
@@ -180,6 +181,15 @@ def save_report(conn, document_id: int, old_version_id: int | None,
                 new_version_id: int, report: dict) -> int:
     """Persist a validated report + citations. Returns the report id."""
     validate_report(report)
+    sections = "\n".join(f"- {c['description']}"
+                         for c in report["textual_changes"])
+    # Persist both diffs: raw for auditability, normalised for readability.
+    diff_text = sections
+    if report.get("diff_unified"):
+        diff_text += "\n\n--- raw unified diff (audit) ---\n" + report["diff_unified"]
+    if report.get("diff_normalized"):
+        diff_text += ("\n\n--- normalized diff (readable) ---\n"
+                      + report["diff_normalized"])
     old_row = (conn.execute("SELECT id FROM document_versions WHERE id=?",
                             (old_version_id,)).fetchone()
                if old_version_id else None)
@@ -189,8 +199,7 @@ def save_report(conn, document_id: int, old_version_id: int | None,
         old_version_id=old_row["id"] if old_row else None,
         new_version_id=new_version_id,
         change_type=report["change_type"],
-        diff_text="\n".join(
-            f"- {c['description']}" for c in report["textual_changes"]),
+        diff_text=diff_text,
         summary=report["summary"],
         affected_sections=report["affected_sections"],
         claims=report["claims"],

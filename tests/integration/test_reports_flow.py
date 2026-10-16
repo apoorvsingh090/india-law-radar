@@ -77,6 +77,7 @@ def test_reports_end_to_end(tmp_path, monkeypatch, capsys):
         for claim in claims:
             assert claim["citation_ids"]
         assert changed["verification_status"] == "unverified"
+        assert "@@" in changed["diff_text"]  # raw audit diff persisted
     finally:
         conn.close()
 

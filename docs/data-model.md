@@ -20,3 +20,8 @@ content_sha256), change_reports, citations, ingestion_runs, review_tasks).
 `lawradar init` applies migrations; the pipeline writes sources,
 documents, versions, and runs. Reports/citations/review rows arrive in
 M3/M4.
+
+**Milestone 3 update:** `change_reports` + `citations` are now written by
+ingest (one draft per new version; duplicates create nothing) and by
+`reports generate`. `review_tasks` still arrives with the review queue
+(M4).

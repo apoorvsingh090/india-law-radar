@@ -33,6 +33,7 @@ class IngestResult:
     content_sha256: str
     extraction_status: str
     warnings: list[str] = field(default_factory=list)
+    report_id: int | None = None
 
 
 def _db_path(config) -> Path:
@@ -124,6 +125,17 @@ def ingest_bytes(
         review_status=review_status,
     )
     row = store.latest_version(conn, document_id)
+    # Draft report for the new version. A report failure must never fail
+    # the ingest itself — it is recorded as a warning for review.
+    report_id: int | None = None
+    try:
+        from lawradar.reporting.generate import generate_for_document
+
+        generated = generate_for_document(conn, document_id)
+        if generated is not None:
+            report_id = generated["report_id"]
+    except Exception as exc:  # noqa: BLE001
+        warnings.append(f"report generation failed ({exc}); flagged for review")
     return IngestResult(
         document_id=document_id,
         version_id=version_id,
@@ -132,6 +144,7 @@ def ingest_bytes(
         content_sha256=sha,
         extraction_status=extraction.status,
         warnings=warnings,
+        report_id=report_id,
     )
 
 

@@ -1,9 +1,10 @@
 # India Law Radar
 
 Source-verifiable monitoring of official Indian legal documents.
-**Milestone 2 (this release):** document ingestion — source registry,
-safe fetcher (allowlist + throttling), SHA-256 dedup, HTML/text-PDF
-extraction with review flagging, manual import, fixture demo, provenance.
+**Milestone 3 (this release):** version comparison — deterministic
+raw + normalised diffs, section attribution, change-type classification,
+validated + persisted change reports with claims and citations,
+auto-generation on ingest.
 
 > Scope honesty: this MVP does **not** claim complete coverage of Indian law,
 > is not a substitute for a qualified advocate, and every future change report
@@ -47,6 +48,9 @@ lawradar ingest manual-sample --file PATH --title "T" [--doc-id ID]
 lawradar documents list        stored documents + version counts
 lawradar documents show <id>   document + versions + extraction status
 lawradar documents search <q>  keyword search (LIKE; FTS arrives in M5)
+lawradar reports list        show reports (filter --document ID)
+lawradar reports show <id>   report + claims + citations
+lawradar reports generate    backfill anything ingest missed
 lawradar --help                full usage
 ```
 
@@ -75,7 +79,8 @@ data/          local-only runtime data (git-ignored except README/.gitkeep)
 ## Roadmap
 
 - M1: skeleton, config, logging, CLI health, tests, docs (done)
-- M2: source registry, safe fetcher, hashing/dedup, extraction (done here)
+- M2: source registry, safe fetcher, hashing/dedup, extraction (done)
+- M3: deterministic diff, change reports with citations (done here)
 - M3: deterministic version comparison
 - M4: structured reports + review queue (LLM optional, never required)
 - M5: web UI + search

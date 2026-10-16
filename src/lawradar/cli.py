@@ -1,4 +1,4 @@
-"""Command-line interface for India Law Radar (Milestone 2).
+"""Command-line interface for India Law Radar (Milestone 3).
 
 Implemented commands (all functional, no placeholders):
   lawradar init              — create data dir, local settings.yaml, migrate db
@@ -9,6 +9,9 @@ Implemented commands (all functional, no placeholders):
   lawradar documents list    — list stored documents + version counts
   lawradar documents show    — show a document with its versions
   lawradar documents search  — keyword search over title/authority/ids
+  lawradar reports list      — change reports with type + verification status
+  lawradar reports show <id> — report detail with claims + citations
+  lawradar reports generate  — backfill reports missed by auto-generation
 """
 from __future__ import annotations
 
@@ -82,6 +85,19 @@ def build_parser() -> argparse.ArgumentParser:
     p_search = docs_sub.add_parser("search", help="Keyword search")
     p_search.add_argument("query")
     p_search.add_argument("--limit", type=int, default=20)
+
+    p_reports = sub.add_parser("reports", help="Inspect change reports")
+    reports_sub = p_reports.add_subparsers(dest="reports_command", required=True)
+    p_rlist = reports_sub.add_parser("list", help="List change reports")
+    p_rlist.add_argument("--document", type=int, default=None,
+                         help="Only reports for this document id")
+    p_rlist.add_argument("--limit", type=int, default=50)
+    p_rshow = reports_sub.add_parser("show", help="Show a report + citations")
+    p_rshow.add_argument("report_id", type=int)
+    p_rgen = reports_sub.add_parser(
+        "generate", help="Backfill missing reports (ingest already auto-generates)")
+    p_rgen.add_argument("--document", type=int, default=None)
+    p_rgen.add_argument("--limit", type=int, default=100)
     return parser
 
 
@@ -148,7 +164,7 @@ def cmd_init(args: argparse.Namespace) -> int:
     return 0
 
 
-APP_LABEL = "India Law Radar v0.2.0 (Milestone 2)"
+APP_LABEL = "India Law Radar v0.3.0 (Milestone 3)"
 
 
 def _sqlite_path(db_url: str, data_dir: Path) -> Path | None:
@@ -380,6 +396,81 @@ def cmd_documents(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_reports(args: argparse.Namespace) -> int:
+    from lawradar.db import store
+    from lawradar.ingestion.pipeline import _db_path
+    from lawradar.reporting.generate import generate_for_document, generate_pending
+
+    config = _effective_config(args)
+    setup_logging(config.log_level, config.log_file)
+    store.init_db(_db_path(config))
+    conn = store.connect(_db_path(config))
+    try:
+        if args.reports_command == "list":
+            rows = store.list_reports(conn, args.limit, args.document)
+            if args.json:
+                print(json.dumps([dict(r) for r in rows], indent=2,
+                                 default=str))
+            else:
+                for r in rows:
+                    old = r["old_version_id"]
+                    pair = (f"v{old}->v{r['new_version_id']}"
+                            if old is not None
+                            else f"v{r['new_version_id']} (first)")
+                    print(f"[{r['id']}] {r['document_title']} "
+                          f"(doc={r['document_id']} {pair}) "
+                          f"type={r['change_type']} status={r['verification_status']}")
+                if not rows:
+                    print("No reports yet. Ingest a source first.")
+        elif args.reports_command == "show":
+            report = store.get_report(conn, args.report_id)
+            if report is None:
+                print(f"unknown report id {args.report_id}", file=sys.stderr)
+                return 2
+            citations = store.list_citations(conn, report["id"])
+            import json as _json
+
+            claims = _json.loads(report["claims_json"])
+            affected = _json.loads(report["affected_sections"])
+            if args.json:
+                payload = dict(report)
+                payload["claims"] = claims
+                payload["affected_sections"] = affected
+                payload["citations"] = [dict(c) for c in citations]
+                print(json.dumps(payload, indent=2, default=str))
+            else:
+                print(f"[{report['id']}] {report['document_title']}")
+                print(f"  change_type={report['change_type']} "
+                      f"verification={report['verification_status']}")
+                print(f"  summary: {report['summary']}")
+                if affected:
+                    print(f"  affected: {', '.join(affected)}")
+                print("  claims:")
+                for claim in claims:
+                    print(f"    - [{claim['claim_type']}] {claim['claim']}")
+                    print(f"      citations: {', '.join(claim['citation_ids'])}")
+                print("  citations:")
+                for cite in citations:
+                    print(f"    - {cite['locator_type']}: {cite['locator_value']}")
+        elif args.reports_command == "generate":
+            if args.document is not None:
+                result = generate_for_document(conn, args.document)
+                created = [result] if result else []
+            else:
+                created = generate_pending(conn, args.limit)
+            if args.json:
+                print(json.dumps(created, indent=2, default=str))
+            else:
+                for item in created:
+                    print(f"report {item['report_id']}: doc={item['document_id']} "
+                          f"type={item['change_type']}")
+                if not created:
+                    print("Nothing to generate — all versions already reported.")
+    finally:
+        conn.close()
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
@@ -393,6 +484,8 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_ingest(args)
     if args.command == "documents":
         return cmd_documents(args)
+    if args.command == "reports":
+        return cmd_reports(args)
     parser.error(f"unknown command: {args.command}")
     return 2
 

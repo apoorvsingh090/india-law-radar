@@ -50,7 +50,8 @@ def test_parser_has_only_implemented_commands():
     parser = build_parser()
     actions = [a for a in parser._subparsers._group_actions]
     commands = set(actions[0].choices) if actions else set()
-    assert commands == {"init", "health", "sources", "ingest", "documents"}
+    assert commands == {"init", "health", "sources", "ingest", "documents",
+                          "reports"}
 
 
 def test_sources_list_runs_in_isolated_dir(tmp_path, monkeypatch, capsys):

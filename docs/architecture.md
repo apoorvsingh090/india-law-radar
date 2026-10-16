@@ -15,4 +15,9 @@ CLI (argparse) → config.py → logging_config.py → local data dir + sqlite
   success/failure — failures never mark the source successfully checked.
 - Raw bytes stored at `data/raw/<sha256>` unless the source policy is
   `restricted`; extracted text always at `data/text/<sha256>.txt`.
-- M3 adds deterministic diff + version comparison on top of these versions.
+- M3 adds: `diffing/compare.py` (raw + normalised diff, section mapping,
+  `text_modified`/`possible_amendment`/`corrigendum`/`unknown` labels) →
+  `reporting/generate.py` builds a schema-validated draft (spec §8) →
+  persisted to `change_reports` + `citations`. Ingest auto-generates the
+  draft; `reports generate` backfills. Deterministic diff always lands
+  before any AI summariser (M4).

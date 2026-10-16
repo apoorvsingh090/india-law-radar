@@ -289,3 +289,105 @@ def latest_runs(conn: sqlite3.Connection, limit: int = 20) -> list[sqlite3.Row]:
         conn.execute("SELECT * FROM ingestion_runs ORDER BY id DESC LIMIT ?",
                      (limit,))
     )
+
+
+# -- change reports + citations ------------------------------------------------
+
+def find_report(
+    conn: sqlite3.Connection,
+    document_id: int,
+    old_version_id: int | None,
+    new_version_id: int,
+) -> sqlite3.Row | None:
+    if old_version_id is None:
+        return conn.execute(
+            "SELECT * FROM change_reports WHERE document_id=? "
+            "AND old_version_id IS NULL AND new_version_id=?",
+            (document_id, new_version_id),
+        ).fetchone()
+    return conn.execute(
+        "SELECT * FROM change_reports WHERE document_id=? "
+        "AND old_version_id=? AND new_version_id=?",
+        (document_id, old_version_id, new_version_id),
+    ).fetchone()
+
+
+def create_report(
+    conn: sqlite3.Connection,
+    *,
+    document_id: int,
+    old_version_id: int | None,
+    new_version_id: int,
+    change_type: str,
+    diff_text: str = "",
+    summary: str = "",
+    affected_sections: list | None = None,
+    claims: list | None = None,
+    verification_status: str = "unverified",
+) -> int:
+    cursor = conn.execute(
+        """INSERT INTO change_reports
+           (document_id, old_version_id, new_version_id, change_type,
+            diff_text, summary, affected_sections, claims_json,
+            verification_status)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+        (document_id, old_version_id, new_version_id, change_type, diff_text,
+         summary, json.dumps(affected_sections or []),
+         json.dumps(claims or []), verification_status),
+    )
+    return int(cursor.lastrowid)
+
+
+def add_citation(
+    conn: sqlite3.Connection,
+    *,
+    change_report_id: int,
+    document_version_id: int,
+    locator_type: str = "text span",
+    locator_value: str = "",
+    quoted_text: str = "",
+    source_url: str = "",
+    verification_status: str = "unverified",
+) -> int:
+    cursor = conn.execute(
+        """INSERT INTO citations
+           (change_report_id, document_version_id, locator_type,
+            locator_value, quoted_text, source_url, verification_status)
+           VALUES (?, ?, ?, ?, ?, ?, ?)""",
+        (change_report_id, document_version_id, locator_type, locator_value,
+         quoted_text[:2000], source_url, verification_status),
+    )
+    return int(cursor.lastrowid)
+
+
+def list_reports(
+    conn: sqlite3.Connection, limit: int = 50, document_id: int | None = None
+) -> list[sqlite3.Row]:
+    if document_id is None:
+        return list(conn.execute(
+            "SELECT r.*, d.title AS document_title FROM change_reports r "
+            "JOIN documents d ON d.id=r.document_id "
+            "ORDER BY r.id DESC LIMIT ?", (limit,)))
+    return list(conn.execute(
+        "SELECT r.*, d.title AS document_title FROM change_reports r "
+        "JOIN documents d ON d.id=r.document_id WHERE r.document_id=? "
+        "ORDER BY r.id DESC LIMIT ?", (document_id, limit)))
+
+
+def get_report(conn: sqlite3.Connection, report_id: int) -> sqlite3.Row | None:
+    return conn.execute(
+        "SELECT r.*, d.title AS document_title FROM change_reports r "
+        "JOIN documents d ON d.id=r.document_id WHERE r.id=?",
+        (report_id,)).fetchone()
+
+
+def list_citations(conn: sqlite3.Connection,
+                   report_id: int) -> list[sqlite3.Row]:
+    return list(conn.execute(
+        "SELECT * FROM citations WHERE change_report_id=? ORDER BY id",
+        (report_id,)))
+
+
+def count_reports(conn: sqlite3.Connection) -> int:
+    row = conn.execute("SELECT COUNT(*) AS c FROM change_reports").fetchone()
+    return int(row["c"])

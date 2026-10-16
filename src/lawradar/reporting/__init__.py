@@ -1,1 +1,1 @@
-"""Structured change reports + JSON schema (Milestone 4+)."""
+"""Structured change reports + schema validation (Milestone 3)."""

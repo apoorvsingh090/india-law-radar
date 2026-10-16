@@ -40,5 +40,7 @@ def test_feedback_validation(tmp_path):
         store.resolve_feedback(conn, fid)
         conn.commit()
         assert store.list_feedback(conn, status="open") == []
+        with pytest.raises(ValueError, match="unknown feedback"):
+            store.resolve_feedback(conn, 99999)
     finally:
         conn.close()

@@ -681,7 +681,11 @@ def cmd_feedback(args: argparse.Namespace) -> int:
                 if not rows:
                     print("No feedback yet.")
         elif args.feedback_command == "resolve":
-            store.resolve_feedback(conn, args.feedback_id)
+            try:
+                store.resolve_feedback(conn, args.feedback_id)
+            except ValueError as exc:
+                print(str(exc), file=sys.stderr)
+                return 2
             conn.commit()
             print(f"feedback {args.feedback_id} resolved")
     finally:

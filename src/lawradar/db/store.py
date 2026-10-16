@@ -552,10 +552,12 @@ def list_feedback(
 
 
 def resolve_feedback(conn: sqlite3.Connection, feedback_id: int) -> None:
-    conn.execute(
+    cursor = conn.execute(
         "UPDATE feedback SET status='resolved', "
         "resolved_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id=?",
         (feedback_id,))
+    if cursor.rowcount == 0:
+        raise ValueError(f"unknown feedback id {feedback_id}")
 
 
 def update_report_summary(

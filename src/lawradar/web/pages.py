@@ -47,6 +47,7 @@ def layout(title: str, body: str) -> str:
         "<a href=\"/\">Dashboard</a><a href=\"/changes\">Changes</a>"
         "<a href=\"/search\">Search</a><a href=\"/sources\">Sources</a>"
         "<a href=\"/review\">Review</a><a href=\"/coverage\">Coverage</a>"
+        "<a href=\"/limitations\">Limitations</a>"
         "<a href=\"/feedback\">Feedback</a><a href=\"/privacy\">Privacy</a>"
         "</nav></header><main>"
         f"<h2>{esc(title)}</h2>{body}</main>"
@@ -276,7 +277,8 @@ def coverage_page(ctx: dict) -> str:
         "require human review before publication.</p>"
         "<h3>Limitations</h3><p>No claim of completeness or currency. "
         "Presence in this database does not mean a provision is in force. "
-        "This tool is not a substitute for a qualified advocate.</p>"
+        "This tool is not a substitute for a qualified advocate. "
+        "Full statement: <a href=\"/limitations\">Limitations</a>.</p>"
         "<h3>Report an error</h3><p>Use <a href=\"/feedback\">Feedback</a> "
         "with the source URL and retrieval timestamp shown on the report "
         "page.</p>")

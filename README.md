@@ -42,7 +42,7 @@ lawradar serve
 Expected: `lawradar health` prints `health: OK` with three PASS lines;
 `pytest` passes (unit + integration).
 
-## CLI (Milestone 2)
+## CLI (Milestone 7)
 
 ```text
 lawradar init [--force]        dirs + config + migrate sqlite schema
@@ -54,7 +54,7 @@ lawradar ingest --all          ingest all enabled sources
 lawradar ingest manual-sample --file PATH --title "T" [--doc-id ID]
 lawradar documents list        stored documents + version counts
 lawradar documents show <id>   document + versions + extraction status
-lawradar documents search <q>  keyword search (LIKE; FTS arrives in M5)
+lawradar documents search <q>  full-text search (FTS5, LIKE fallback)
 lawradar reports list        show reports (filter --document ID)
 lawradar reports show <id>   report + claims + citations
 lawradar reports generate    backfill anything ingest missed
@@ -62,6 +62,9 @@ lawradar reports verify <id>  deterministic citation check (exit 1 on fail)
 lawradar reports summarise <id> [--ai]  reword summary (validated, no model by default)
 lawradar review --list        pending human-review queue
 lawradar review <id> --approve|--reject|--changes --reviewer R --notes "…"
+lawradar serve [--host 127.0.0.1] [--port 8080] [--token ...]
+lawradar eval                  curated pilot evaluation set (expect 7/7)
+lawradar feedback list         triage user error reports
 lawradar --help                full usage
 ```
 
@@ -85,8 +88,9 @@ and `.env.example`.
 config/        example YAML (local settings.yaml is git-ignored)
 docs/          architecture, data-model, source-policy, evaluation, limitations
 src/lawradar/  cli, config, logging, db/store, sources/*, ingestion/*,
-               extraction/* + stubs for Milestones 3-5
-migrations/    001_init.sql (full MVP schema)
+               extraction/*, diffing/*, reporting/*, review/*, ai/*,
+               search/fts, web/*, evaluation/*
+migrations/    001-004 (schema, ai_attempts, FTS index, feedback)
 tests/         unit + integration + fixtures + evaluation notes
 scripts/       operator helpers (runbook arrives with real-source pilot)
 data/          local-only runtime data (git-ignored except README/.gitkeep)
@@ -101,11 +105,6 @@ data/          local-only runtime data (git-ignored except README/.gitkeep)
 - M5: web UI, FTS search, JSON API (done)
 - M6: pilot adapters, evaluation set, coverage + runbook (done)
 - M7: beta hardening, feedback loop, deployment docs (done here)
-- M3: deterministic version comparison
-- M4: structured reports + review queue (LLM optional, never required)
-- M5: web UI + search
-- M6: real-source pilot against permitted official sources
-- M7: public-beta hardening
 
 ## Safeguards
 

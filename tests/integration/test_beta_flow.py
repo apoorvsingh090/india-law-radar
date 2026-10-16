@@ -81,6 +81,8 @@ def test_beta_pages(live):
         status, _, body = _get(base, path)
         assert status == 200, path
         assert marker in body, path
+    _, _, home = _get(base, "/")
+    assert 'href="/limitations"' in home and 'href="/feedback"' in home
 
 
 def test_security_headers_present(live):

@@ -137,6 +137,44 @@ def test_failed_http_run_does_not_mark_success(tmp_path, monkeypatch):
         conn.close()
 
 
+def test_partial_run_does_not_mark_success(tmp_path, monkeypatch):
+    """One good doc + one unreadable doc -> 'partial', no success recorded."""
+    from lawradar.sources import fixture as fix
+
+    monkeypatch.chdir(tmp_path)
+    for var in ("LAWRADAR_CONFIG", "LAWRADAR_DATA_DIR", "LAWRADAR_DB_URL",
+                "LAWRADAR_LOG_LEVEL", "LAWRADAR_LOG_FILE"):
+        monkeypatch.delenv(var, raising=False)
+    good = fix.list_fixtures()[0]
+    bad = fix.FixtureDocument(
+        source_document_id="missing-doc", title="Missing doc",
+        filename="no-such-file.html", document_type="Act",
+        issuing_authority="Fixture", jurisdiction="central",
+        official_url="https://example.invalid/missing",
+    )
+    monkeypatch.setattr(fix, "list_fixtures", lambda: [good, bad])
+    config = load_settings()
+    config.data_dir = str(tmp_path / "data")
+    config.db_url = f"sqlite:///{tmp_path / 'data' / 'lawradar.db'}"
+    sources = _sources_yaml(tmp_path, [{
+        "id": "fixture-sample", "name": "Fixture",
+        "base_url": "https://example.invalid/fixture/",
+        "access_method": "fixture", "terms_review_status": "reviewed_ok",
+        "enabled": True, "rate_limit_seconds": 0,
+    }])
+    summary = run_ingestion(config, sources, source_id="fixture-sample")
+    run = summary["runs"][0]
+    assert run["status"] == "partial"
+    assert run["failed"] == 1 and run["downloaded"] == 1
+    conn = store.connect(tmp_path / "data" / "lawradar.db")
+    try:
+        source = store.get_source(conn, "fixture-sample")
+        assert not source["last_success_at"]
+        assert source["last_error"]
+    finally:
+        conn.close()
+
+
 def test_fixture_ingest_twice_via_cli(tmp_path, monkeypatch, capsys):
     monkeypatch.chdir(tmp_path)
     for var in ("LAWRADAR_CONFIG", "LAWRADAR_DATA_DIR", "LAWRADAR_DB_URL",

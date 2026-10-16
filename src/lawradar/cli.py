@@ -322,7 +322,7 @@ def cmd_ingest(args: argparse.Namespace) -> int:
                   f"failed={run.get('failed', 0)})")
             for err in run.get("errors", []):
                 print(f"  error: {err}")
-    failed = sum(1 for r in summary["runs"] if r["status"] == "failed")
+    failed = sum(1 for r in summary["runs"] if r["status"] in ("failed", "partial"))
     return 1 if failed else 0
 
 

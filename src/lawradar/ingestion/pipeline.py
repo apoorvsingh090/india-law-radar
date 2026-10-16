@@ -293,14 +293,20 @@ def ingest_source(
         conn.commit()
         return {"run_id": run_id, "status": "failed", "changed": changed,
                 "failed": failed, "errors": errors}
-    status = "failed" if failed and not downloaded else "success"
+    # A run with any failure is never recorded as a success: only a clean
+    # run updates last_success_at. Partial progress keeps its errors visible
+    # on both the run row and the source row.
+    clean = failed == 0
+    if clean:
+        status = "success"
+    elif downloaded:
+        status = "partial"
+    else:
+        status = "failed"
     store.finish_run(conn, run_id, status=status, discovered=discovered,
                      downloaded=downloaded, changed=changed, failed=failed,
                      error_summary="; ".join(errors))
-    # A run with any failure but some progress still records the failure;
-    # only a clean run marks the source successfully checked.
-    store.record_source_check(conn, source.id, status == "success",
-                              "; ".join(errors))
+    store.record_source_check(conn, source.id, clean, "; ".join(errors))
     conn.commit()
     return {"run_id": run_id, "status": status, "discovered": discovered,
             "downloaded": downloaded, "changed": changed, "failed": failed,

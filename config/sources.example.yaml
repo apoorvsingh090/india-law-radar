@@ -48,11 +48,11 @@ sources:
     source_type: legislation_catalogue
     jurisdiction: central
     access_method: manual_import
-    terms_review_status: not_reviewed
+    terms_review_status: reviewed_ok
     poll_interval_minutes: 1440
     rate_limit_seconds: 5
-    enabled: false
-    coverage_notes: "Pilot 2026-10-16: /robots.txt is Allow: / but homepage returned HTTP 403 to an automated client; /sitemap.xml serves ministry content, not legislation. Supported path: operator-saved listing pages via sources/legislative.py, or single-file manual import. See docs/coverage.md."
+    enabled: true
+    coverage_notes: "Pilot 2026-10-17: operator verified two official PDFs field-by-field (Repealing and Amending (Second) Act 2017; Constitution 34th Amendment 1974). Automated direct-PDF fetch 403s; access_method stays manual_import until a stable listing/JSON endpoint is confirmed. See docs/coverage.md."
     storage_policy: unknown
 
   - id: egazette

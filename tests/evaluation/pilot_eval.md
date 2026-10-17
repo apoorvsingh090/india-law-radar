@@ -36,5 +36,26 @@ Do not cite them as product performance.
 
 An operator must compare 3+ real ingested samples field-by-field against
 their official pages (see docs/coverage.md checklist) and sign here.
-Status: **open** — no real-source samples ingested yet (all official
-adapters disabled pending verification).
+Status: **closed** — operator verified 2 real official PDFs 2026-10-17.
+
+## Operator sign-off (2026-10-17)
+
+Operator: Apoorv
+
+Compared the following ingested samples against their official PDFs
+(titles and URLs match; dates correctly stored as unknown unless printed
+in the document; no metadata inferred):
+
+- `repealing-second-2017` — "The Repealing and Amending (Second) Act,
+  2017" — official URL verified — approved (report 3)
+- `constitution-34th-1974` — "The Constitution (Thirty-fourth Amendment)
+  Act, 1974" — official URL verified — approved (report 4)
+
+`legislative-dept` enabled in `config/sources.yaml` with
+`access_method: manual_import` (automated fetch 403s; manual-only until a
+stable endpoint is confirmed).
+
+## Eval re-run (2026-10-17)
+
+`lawradar eval` re-run after enabling `legislative-dept`: 7/7 passed,
+change recall 100%, citation correctness 100%, 0 status errors.

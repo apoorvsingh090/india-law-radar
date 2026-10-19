@@ -16,10 +16,10 @@ jobs:
       matrix:
         python-version: ["3.11", "3.12"]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: ${{ matrix.python-version }}
           cache: pip
@@ -33,10 +33,10 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: "3.12"
           cache: pip
@@ -44,9 +44,9 @@ jobs:
       - name: Install ruff
         run: pip install ruff
 
-      - name: Ruff — critical errors (blocking)
+      - name: Ruff â€” critical errors (blocking)
         run: ruff check --select E9,F63,F7,F82 .
 
-      - name: Ruff — full report (non-blocking)
+      - name: Ruff â€” full report (non-blocking)
         continue-on-error: true
         run: ruff check . --output-format=github

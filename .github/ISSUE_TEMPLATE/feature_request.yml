@@ -1,0 +1,39 @@
+name: Feature request
+description: Suggest an improvement or a new source/capability
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: Describe the feature
+      description: What should India Law Radar do that it doesn't today?
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Use case
+      description: Why is this useful for source-verifiable legal monitoring?
+    validations:
+      required: true
+  - type: textarea
+    id: source
+    attributes:
+      label: Proposed source (if this adds a source)
+      description: |
+        Official URL, document type, and update frequency. New sources must be
+        official/government publishers and pass `docs/source-policy.md` rules
+        (robots.txt, rate limits, provenance). Never propose bypassing access
+        controls.
+    validations:
+      required: false
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checklist
+      options:
+        - label: I searched existing issues and the roadmap for duplicates
+          required: true
+        - label: I have read `docs/source-policy.md` and `docs/limitations.md`
+          required: true

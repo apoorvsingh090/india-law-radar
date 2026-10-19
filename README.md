@@ -1,5 +1,9 @@
 # India Law Radar
 
+[![CI](https://img.shields.io/github/actions/workflow/status/apoorvsingh090/india-law-radar/ci.yml?branch=main)](https://github.com/apoorvsingh090/india-law-radar/actions/workflows/ci.yml)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](pyproject.toml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+
 Source-verifiable monitoring of official Indian legal documents.
 **Milestone 7 (this release — public beta):** hardening for readers —
 per-IP POST rate limits, security headers, token-gated non-loopback
@@ -112,3 +116,17 @@ data/          local-only runtime data (git-ignored except README/.gitkeep)
 - Original bytes + URL + retrieval time + SHA-256 preserved (from M2).
 - Respects robots.txt, terms, rate limits; never bypasses CAPTCHA/auth.
 - See `docs/source-policy.md` and `docs/limitations.md` before adding sources.
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for setup, testing, and source rules,
+and the [Code of Conduct](CODE_OF_CONDUCT.md). Use the issue templates for
+bugs and feature/source requests; beginner-friendly issues carry the
+[`good first issue`](https://github.com/apoorvsingh090/india-law-radar/labels/good%20first%20issue)
+label. Changes are tracked in [CHANGELOG.md](CHANGELOG.md).
+
+## Security
+
+Report vulnerabilities privately via
+[GitHub Security Advisories](https://github.com/apoorvsingh090/india-law-radar/security/advisories);
+see [SECURITY.md](SECURITY.md).

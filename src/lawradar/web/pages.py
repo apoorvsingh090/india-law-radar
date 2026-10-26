@@ -41,10 +41,13 @@ def layout(title: str, body: str) -> str:
     return (
         "<!DOCTYPE html><html lang=\"en\"><head><meta charset=\"utf-8\">"
         "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
+        "<link rel=\"alternate\" type=\"application/atom+xml\" "
+        "href=\"/feed.xml\" title=\"Published change reports (Atom)\">"
         f"<title>{esc(title)} — {APP_TITLE}</title>"
         f"<style>{_CSS}</style></head><body>"
         f"<header><h1>{APP_TITLE}</h1><nav>"
         "<a href=\"/\">Dashboard</a><a href=\"/changes\">Changes</a>"
+        "<a href=\"/feed.xml\">Feed</a>"
         "<a href=\"/search\">Search</a><a href=\"/sources\">Sources</a>"
         "<a href=\"/review\">Review</a><a href=\"/coverage\">Coverage</a>"
         "<a href=\"/limitations\">Limitations</a>"

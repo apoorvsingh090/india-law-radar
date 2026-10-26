@@ -5,14 +5,31 @@ All notable changes to India Law Radar will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.8.0] - 2026-10-23
 
 ### Added
 
+- Milestone 8 (radar loop): `lawradar watch` sweeps enabled sources on
+  their `poll_interval_minutes` schedule — `--once` for schedulers
+  (exit 1 on failure), `--poll-seconds`/`--max-sweeps` for long-running
+  operation; manual_import sources are always skipped with a reason
+- Atom feed `/feed.xml` of **published** reports only (publication
+  remains exclusively a human review approval); feed autodiscovery +
+  nav link on all pages
+- `store.list_published_reports`; deterministic, XML-escaped feed
+  builder (`web/feeds.py`) with a feed-level author for Atom validity
+- Real-source pilot runbook `docs/pilot.md` (daily loop, scheduling,
+  enabling gate, feed verification)
 - GitHub Actions CI: pytest on Python 3.11 + 3.12, ruff lint gate
 - Community files: `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `SECURITY.md`
 - Issue forms (bug report, feature request) and pull request template
-- `CHANGELOG.md`
+
+### Fixed
+
+- Doc currency for M8: `docs/limitations.md`, `docs/coverage.md`,
+  `docs/source-policy.md`, SECURITY supported version
+- Fetcher User-Agent now derives from the package version (no stale
+  `0.2.0` string)
 
 ## [0.7.0] - 2026-10-17
 

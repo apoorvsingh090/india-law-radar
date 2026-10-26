@@ -381,6 +381,21 @@ def get_report(conn: sqlite3.Connection, report_id: int) -> sqlite3.Row | None:
         (report_id,)).fetchone()
 
 
+def list_published_reports(
+    conn: sqlite3.Connection, limit: int = 50
+) -> list[sqlite3.Row]:
+    """Reports a human approved (published_at set), newest first.
+
+    The only feed-visible set — ingestion can never add to it because
+    publication happens exclusively in review approval.
+    """
+    return list(conn.execute(
+        "SELECT r.*, d.title AS document_title FROM change_reports r "
+        "JOIN documents d ON d.id=r.document_id "
+        "WHERE r.published_at IS NOT NULL "
+        "ORDER BY r.published_at DESC, r.id DESC LIMIT ?", (limit,)))
+
+
 def list_reports_filtered(
     conn: sqlite3.Connection,
     *,

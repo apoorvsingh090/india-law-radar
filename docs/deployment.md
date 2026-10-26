@@ -44,7 +44,7 @@ Any Python host works (buildpack-style: `pip install .`, then
 | Variable | Purpose | Default |
 |---|---|---|
 | `LAWRADAR_DATA_DIR` | runtime data | `./data` |
-| `LAWRADAR_DB_URL` | sqlite only in M7 | `sqlite:///./data/lawradar.db` |
+| `LAWRADAR_DB_URL` | sqlite only (M8) | `sqlite:///./data/lawradar.db` |
 | `LAWRADAR_LOG_LEVEL` / `_LOG_FILE` | logging | `INFO` / stdout |
 | `LAWRADAR_REVIEW_POLICY` | only `manual` | `manual` |
 | `LAWRADAR_AI_ENABLED` / `_AI_COMMAND` | optional summariser | `false` / empty |

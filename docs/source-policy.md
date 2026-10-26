@@ -12,9 +12,14 @@
 6. A failed run must not mark a source successfully checked; a missing
    document is not a repeal without evidence.
 
-Real-source verification status: **none yet** — `indiacode` stays
-`enabled: false` + `terms: not_reviewed`. Verified in M2: the `fixture`
-adapter (labelled demo data, no network) and the `manual_import` flow
-(operator-supplied file + recorded provenance). M2 `http_poll` only probes
-a source's own base URL under the allowlist; per-document discovery waits
-for M6 terms verification.
+Real-source verification status:
+
+- `fixture` (labelled demo data, no network) and the `manual_import` flow
+  (operator-supplied file + recorded provenance) were verified in M2.
+- `legislative-dept` is operator-verified for **manual import only**
+  (2026-10-17); automation returns HTTP 403, so it stays out of sweeps.
+- `indiacode` and `egazette` remain `enabled: false` +
+  `terms: not_reviewed`; enabling anything requires the checks in
+  `docs/coverage.md`.
+- M2 `http_poll` only probes a source's own base URL under the allowlist;
+  per-document discovery remains gated on terms verification.

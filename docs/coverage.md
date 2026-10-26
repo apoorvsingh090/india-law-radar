@@ -1,4 +1,4 @@
-# Source coverage (Milestone 6 pilot — verified 2026-10-16)
+# Source coverage (pilot — verified 2026-10-16, updated 2026-10-17)
 
 All live checks below were made from the build sandbox with a clear
 `IndiaLawRadar/... pilot-check` User-Agent, one page per source, no
@@ -17,7 +17,7 @@ anything: sites change.
 - Supported today: `manual-sample` import of India Code PDFs the operator
   downloads in a browser (provenance recorded, hash-pinned).
 
-## legislative-dept — DISABLED (manual path supported)
+## legislative-dept — ENABLED for manual import only
 
 - `/robots.txt` → HTTP 200, `User-agent: * / Allow: /`. Automated
   fetching is not disallowed by robots.
@@ -35,7 +35,11 @@ anything: sites change.
   extracts same-host Act links — off-host links are dropped with a
   warning; (2) single-file `manual_import`.
 - `http_poll` for this source would only probe the base URL (M2 scope)
-  and is **disabled** — a 403 probe teaches nothing and wastes budget.
+  and stays off — a 403 probe teaches nothing and wastes budget.
+- Status 2026-10-17: operator verified two official PDFs field-by-field
+  (Repealing and Amending (Second) Act 2017; Constitution 34th Amendment
+  1974), so the `manual_import` source is `enabled: true`. Automated
+  fetching remains off; `lawradar watch` always skips it with a reason.
 
 ## egazette — DISABLED, unreachable from sandbox
 

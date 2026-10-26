@@ -41,7 +41,15 @@ CLI (argparse) → config.py → logging_config.py → local data dir + sqlite
   eval`) → `docs/coverage.md` (per-source live findings) +
   `docs/runbook.md` (failure table, reprocessing recipes).
 - M7 adds: per-IP POST rate limiting + security headers + `--token`
-  gating in `web/server.py`, `feedback` table (migration `004`) with
+  gating in `web/server.py`, feedback` table (migration `004`) with
   `/feedback` intake auto-opening review tasks and `feedback` CLI
   triage, `/privacy` + `/limitations` pages, `docs/deployment.md` +
   `docs/feedback.md`.
+- M8 adds: `ingestion/watch.py` — `lawradar watch` computes due sources
+  (`enabled` + `poll_interval_minutes` elapsed since the DB's
+  `last_checked_at`, which registry re-syncs never clobber) and sweeps
+  them through the idempotent pipeline; manual_import sources are
+  skipped with a reason (humans supply `--file`). Clock/sleep/stop are
+  injectable, so the loop is unit-tested without waiting. `web/feeds.py`
+  renders `/feed.xml` (Atom) strictly from `store.list_published_reports`
+  — only human-approved reports (`published_at`) can ever appear.

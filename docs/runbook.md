@@ -21,6 +21,10 @@
 | `partial` runs | some docs failed | Fix cause, re-run ingest — successes dedup, failures retry |
 | `search` empty on old DB | pre-M5 versions unindexed | `documents search` auto-backfills via `ensure_indexed`; or `reports generate` |
 | `verify` → `failed` citations | quote/URL drift | Inspect `reports show`; re-ingest if the source changed; reject if fabricated |
+| `watch --once` exit 1 | a source failed its sweep | Check the per-source error line above it; apply the matching row of this table — never escalate retries |
+| `watch` skips a source (`not due until …`) | poll interval not elapsed | Nothing to do — the schedule is working; force with `lawradar ingest <id>` if you must |
+| `watch` skips a source (`manual_import`) | by design | Humans supply the file: `lawradar ingest <id> --file PATH` (see `docs/pilot.md`) |
+| `/feed.xml` missing an expected report | report not approved yet | `review --list`, then `--approve` with notes — the feed only ever lists published reports |
 
 ## Reprocessing recipes
 

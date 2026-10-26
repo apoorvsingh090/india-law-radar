@@ -5,10 +5,11 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
 Source-verifiable monitoring of official Indian legal documents.
-**Milestone 7 (this release — public beta):** hardening for readers —
-per-IP POST rate limits, security headers, token-gated non-loopback
-serving, error-reporting loop (`/feedback` → review queue → `feedback`
-triage), privacy/limitations pages, and deployment docs. Still zero paid
+**Milestone 8 (this release):** the radar loop — `lawradar watch`
+sweeps due sources on their poll schedule (cron-friendly `--once`),
+and `/feed.xml` serves an Atom feed of **approved** reports only, so
+readers can subscribe without trusting unpublished drafts. Includes the
+real-source pilot runbook (`docs/pilot.md`). Still zero paid
 dependencies.
 
 > Scope honesty: this MVP does **not** claim complete coverage of Indian law,
@@ -39,14 +40,15 @@ pytest
 # 6. Start the web UI (loopback only)
 lawradar serve
 # open http://127.0.0.1:8080 — dashboard, changes, report detail,
-# search, sources, review queue, coverage. Use --token for review
-# POSTs if binding beyond loopback (serve refuses otherwise).
+# search, sources, review queue, coverage, Atom feed (/feed.xml,
+# approved reports only). Use --token for review POSTs if binding
+# beyond loopback (serve refuses otherwise).
 ```
 
 Expected: `lawradar health` prints `health: OK` with three PASS lines;
 `pytest` passes (unit + integration).
 
-## CLI (Milestone 7)
+## CLI (Milestone 8)
 
 ```text
 lawradar init [--force]        dirs + config + migrate sqlite schema
@@ -56,6 +58,8 @@ lawradar sources check <id>    registry probe for one source
 lawradar ingest <source-id>    ingest fixture / manual / http-probe source
 lawradar ingest --all          ingest all enabled sources
 lawradar ingest manual-sample --file PATH --title "T" [--doc-id ID]
+lawradar watch [--once]        sweep due sources on their poll schedule
+                               (loop with --poll-seconds; exit 1 on --once failure)
 lawradar documents list        stored documents + version counts
 lawradar documents show <id>   document + versions + extraction status
 lawradar documents search <q>  full-text search (FTS5, LIKE fallback)
@@ -90,13 +94,14 @@ and `.env.example`.
 
 ```text
 config/        example YAML (local settings.yaml is git-ignored)
-docs/          architecture, data-model, source-policy, evaluation, limitations
+docs/          architecture, data-model, source-policy, evaluation, limitations,
+               pilot runbook (real-source operation, M8)
 src/lawradar/  cli, config, logging, db/store, sources/*, ingestion/*,
                extraction/*, diffing/*, reporting/*, review/*, ai/*,
-               search/fts, web/*, evaluation/*
+               search/fts, web/* (incl. Atom feed), evaluation/*
 migrations/    001-004 (schema, ai_attempts, FTS index, feedback)
 tests/         unit + integration + fixtures + evaluation notes
-scripts/       operator helpers (runbook arrives with real-source pilot)
+scripts/       operator helpers (probe script; daily pilot loop is CLI-only)
 data/          local-only runtime data (git-ignored except README/.gitkeep)
 ```
 
@@ -108,7 +113,8 @@ data/          local-only runtime data (git-ignored except README/.gitkeep)
 - M4: review queue, citation checks, optional AI summariser (done)
 - M5: web UI, FTS search, JSON API (done)
 - M6: pilot adapters, evaluation set, coverage + runbook (done)
-- M7: beta hardening, feedback loop, deployment docs (done here)
+- M7: beta hardening, feedback loop, deployment docs (done)
+- M8: watch sweeps, Atom feed of approved reports, pilot runbook (done here)
 
 ## Safeguards
 

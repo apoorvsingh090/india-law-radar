@@ -1,4 +1,4 @@
-"""Stdlib web server (Milestone 7): no new dependencies.
+"""Stdlib web server (Milestone 8): no new dependencies.
 
 Serves the dashboard, change feed, report detail, search, source
 registry, review queue, coverage/privacy/limitations pages, feedback
@@ -17,7 +17,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from lawradar.db import store
 from lawradar.search import fts as search_fts
-from lawradar.web import pages
+from lawradar.web import feeds, pages
 
 MAX_POST_BYTES = 1_000_000
 
@@ -48,7 +48,7 @@ class RateLimiter:
 
 
 class Handler(BaseHTTPRequestHandler):
-    server_version = "IndiaLawRadar/0.7.0"
+    server_version = "IndiaLawRadar/0.8.0"
 
     # -- helpers ---------------------------------------------------------
     def _db(self):
@@ -117,7 +117,14 @@ class Handler(BaseHTTPRequestHandler):
                                    report_id=query.get("report", [""])[0],
                                    token=self._token_value(query)))
                 elif path == "/health":
-                    self._json({"status": "ok", "version": "0.7.0"})
+                    self._json({"status": "ok", "version": "0.8.0"})
+                elif path == "/feed.xml":
+                    # Published-only Atom feed (M8): the review gate, not
+                    # ingestion, decides what appears here.
+                    rows = [dict(r) for r in
+                            store.list_published_reports(conn, limit=50)]
+                    self._send(200, feeds.atom_feed(rows),
+                               "application/atom+xml; charset=utf-8")
                 elif path == "/api/sources":
                     self._json([dict(r) for r in store.list_sources(conn)])
                 elif path == "/api/reports":

@@ -13,9 +13,12 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
-USER_AGENT = "IndiaLawRadar/0.2.0 (+local MVP; respects robots.txt and rate limits)"
+from lawradar import __version__
+
+USER_AGENT = (f"IndiaLawRadar/{__version__} "
+              "(+local MVP; respects robots.txt and rate limits)")
 
 MAX_REDIRECTS = 5
 

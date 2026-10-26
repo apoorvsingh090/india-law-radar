@@ -1,4 +1,4 @@
-"""Command-line interface for India Law Radar (Milestone 7).
+"""Command-line interface for India Law Radar (Milestone 8).
 
 Implemented commands (all functional, no placeholders):
   lawradar init              — create data dir, local settings.yaml, migrate db
@@ -6,6 +6,7 @@ Implemented commands (all functional, no placeholders):
   lawradar sources list      — show registry (DB-synced) with check timestamps
   lawradar ingest <id>       — ingest one source (fixture / manual --file / http probe)
   lawradar ingest --all      — ingest all enabled sources
+  lawradar watch [--once]    — sweep due sources on schedule (the radar loop)
   lawradar documents list    — list stored documents + version counts
   lawradar documents show    — show a document with its versions
   lawradar documents search  — keyword search over title/authority/ids
@@ -85,6 +86,21 @@ def build_parser() -> argparse.ArgumentParser:
                                "(recorded as provenance)")
     p_ingest.add_argument("--sources-file", default=None,
                           help="Alternate sources YAML")
+
+    p_watch = sub.add_parser(
+        "watch", help="Sweep due enabled sources on their poll schedule")
+    p_watch.add_argument("--once", action="store_true",
+                         help="Run a single sweep and exit (cron/"
+                              "scheduled-task friendly)")
+    p_watch.add_argument("--poll-seconds", type=float, default=300.0,
+                         help="Sleep between sweeps when looping "
+                              "(default 300)")
+    p_watch.add_argument("--max-sweeps", type=int, default=None,
+                         help="Stop after N sweeps (default: until Ctrl-C)")
+    p_watch.add_argument("--limit", type=int, default=100,
+                         help="Max documents per source per sweep")
+    p_watch.add_argument("--sources-file", default=None,
+                         help="Alternate sources YAML")
 
     p_docs = sub.add_parser("documents", help="Inspect stored documents")
     docs_sub = p_docs.add_subparsers(dest="documents_command", required=True)
@@ -218,7 +234,7 @@ def cmd_init(args: argparse.Namespace) -> int:
     return 0
 
 
-APP_LABEL = "India Law Radar v0.7.0 (Milestone 7)"
+APP_LABEL = "India Law Radar v0.8.0 (Milestone 8)"
 
 
 def _sqlite_path(db_url: str, data_dir: Path) -> Path | None:
@@ -395,6 +411,52 @@ def cmd_ingest(args: argparse.Namespace) -> int:
                 print(f"  error: {err}")
     failed = sum(1 for r in summary["runs"] if r["status"] in ("failed", "partial"))
     return 1 if failed else 0
+
+
+def cmd_watch(args: argparse.Namespace) -> int:
+    from lawradar.ingestion.watch import run_watch
+
+    config = _effective_config(args)
+    setup_logging(config.log_level, config.log_file)
+    logger = get_logger("lawradar.watch")
+
+    def _report(result) -> None:
+        if args.json:
+            return  # dumped once, at the end
+        for source_id, run in zip(result.ingested, result.runs):
+            print(f"[sweep {result.sweep}] {source_id}: {run['status']} "
+                  f"(changed={run.get('changed', 0)} "
+                  f"failed={run.get('failed', 0)})")
+            for err in run.get("errors", []):
+                print(f"  error: {err}")
+        for source_id, reason in result.skipped.items():
+            print(f"[sweep {result.sweep}] {source_id}: skipped ({reason})")
+
+    if not args.once:
+        print("Watching enabled sources on their poll schedule "
+              "(Ctrl-C to stop). manual_import sources always need "
+              "an explicit `lawradar ingest <id> --file …`.")
+    try:
+        results = run_watch(
+            config,
+            getattr(args, "sources_file", None) or None,
+            limit=args.limit,
+            poll_seconds=args.poll_seconds,
+            max_sweeps=1 if args.once else args.max_sweeps,
+            on_sweep=_report,
+        )
+    except KeyboardInterrupt:
+        print("watch interrupted; finished cleanly")
+        return 0
+    if args.json:
+        print(json.dumps([r.to_dict() for r in results], indent=2))
+    # A failed sweep is fatal only in --once mode (schedulers retry);
+    # the loop keeps going because one bad source must not stop the rest.
+    failed = any(result.failed for result in results)
+    if args.once and failed:
+        logger.error("watch sweep had failed/partial runs")
+        return 1
+    return 0
 
 
 def cmd_documents(args: argparse.Namespace) -> int:
@@ -708,6 +770,8 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_sources(args)
     if args.command == "ingest":
         return cmd_ingest(args)
+    if args.command == "watch":
+        return cmd_watch(args)
     if args.command == "documents":
         return cmd_documents(args)
     if args.command == "reports":

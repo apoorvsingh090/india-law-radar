@@ -6,7 +6,10 @@ Respects robots.txt (Allow: /) and fetches one page with a clear UA.
 import re
 import urllib.request
 
-UA = "IndiaLawRadar/0.8.0 pilot-check (single page, respects robots.txt)"
+from lawradar import __version__
+
+UA = (f"IndiaLawRadar/{__version__} pilot-check "
+      "(single page, respects robots.txt)")
 
 req = urllib.request.Request(
     "https://www.legislative.gov.in/", headers={"User-Agent": UA}

@@ -1,4 +1,4 @@
-"""Command-line interface for India Law Radar (Milestone 8).
+"""Command-line interface for India Law Radar (Milestone 9).
 
 Implemented commands (all functional, no placeholders):
   lawradar init              — create data dir, local settings.yaml, migrate db
@@ -64,6 +64,10 @@ def build_parser() -> argparse.ArgumentParser:
     p_sources = sub.add_parser("sources", help="Inspect the source registry")
     sources_sub = p_sources.add_subparsers(dest="sources_command", required=True)
     sources_sub.add_parser("list", help="List sources with check status")
+    p_sources_health = sources_sub.add_parser(
+        "health", help="Per-source health/staleness (exit 1 if unhealthy)")
+    p_sources_health.add_argument(
+        "--sources-file", default=None, help="Alternate sources YAML")
     p_check = sources_sub.add_parser(
         "check", help="Record a connectivity probe (no fetch in M2)")
     p_check.add_argument("source_id", help="Source id to probe")
@@ -234,7 +238,7 @@ def cmd_init(args: argparse.Namespace) -> int:
     return 0
 
 
-APP_LABEL = "India Law Radar v0.8.0 (Milestone 8)"
+APP_LABEL = "India Law Radar v0.9.0 (Milestone 9)"
 
 
 def _sqlite_path(db_url: str, data_dir: Path) -> Path | None:
@@ -345,6 +349,24 @@ def cmd_sources(args: argparse.Namespace) -> int:
         rows = store.list_sources(conn)
     finally:
         conn.close()
+    if args.sources_command == "health":
+        from lawradar.ingestion.health import evaluate_sources, summarize
+
+        summary = summarize(evaluate_sources([dict(r) for r in rows]))
+        if args.json:
+            print(json.dumps(summary, indent=2))
+        else:
+            if not summary["sources"]:
+                print("No sources configured. See config/sources.example.yaml.")
+            for item in summary["sources"]:
+                due = (f" next_due={item['next_due_at']}"
+                       if item["next_due_at"] else "")
+                print(f"- {item['source_id']}: {item['status']} - "
+                      f"{item['detail']}{due}")
+            print(f"health: {'OK' if summary['healthy'] else 'FAILED'} "
+                  f"({summary['monitored']} monitored, "
+                  f"{summary['stale']} stale, {summary['failing']} failing)")
+        return 0 if summary["healthy"] else 1
     if args.sources_command == "check":
         wanted = args.source_id
         match = next((r for r in rows if r["id"] == wanted), None)

@@ -53,3 +53,11 @@ CLI (argparse) → config.py → logging_config.py → local data dir + sqlite
   injectable, so the loop is unit-tested without waiting. `web/feeds.py`
   renders `/feed.xml` (Atom) strictly from `store.list_published_reports`
   — only human-approved reports (`published_at`) can ever appear.
+- M9 adds: `ingestion/health.py` — pure evaluation of source rows into
+  `ok` / `due` / `stale` / `failing` / `manual` / `disabled` from
+  recorded timestamps only. Staleness is
+  `max(15, 2 x poll_interval)` minutes without a success, so one missed
+  sweep is tolerated but a stopped loop is visible. `sources health`
+  (exit 1 when unhealthy), the dashboard, `/sources`, and
+  `/api/sources/health` share this function; no network calls and no
+  new dependencies.

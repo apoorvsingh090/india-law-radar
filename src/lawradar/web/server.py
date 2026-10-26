@@ -1,4 +1,4 @@
-"""Stdlib web server (Milestone 8): no new dependencies.
+"""Stdlib web server (Milestone 9): no new dependencies.
 
 Serves the dashboard, change feed, report detail, search, source
 registry, review queue, coverage/privacy/limitations pages, feedback
@@ -16,6 +16,7 @@ import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from lawradar.db import store
+from lawradar.ingestion.health import evaluate_sources, summarize, with_health
 from lawradar.search import fts as search_fts
 from lawradar.web import feeds, pages
 
@@ -48,7 +49,7 @@ class RateLimiter:
 
 
 class Handler(BaseHTTPRequestHandler):
-    server_version = "IndiaLawRadar/0.8.0"
+    server_version = "IndiaLawRadar/0.9.0"
 
     # -- helpers ---------------------------------------------------------
     def _db(self):
@@ -97,9 +98,9 @@ class Handler(BaseHTTPRequestHandler):
                 elif path == "/search":
                     self._search(conn, query.get("q", [""])[0])
                 elif path == "/sources":
-                    rows = store.list_sources(conn)
-                    self._page("Sources",
-                               pages.sources_page([dict(r) for r in rows]))
+                    rows = with_health(
+                        [dict(r) for r in store.list_sources(conn)])
+                    self._page("Sources", pages.sources_page(rows))
                 elif path == "/review":
                     tasks = store.list_review_tasks(conn, status="pending")
                     self._page("Review queue",
@@ -117,7 +118,7 @@ class Handler(BaseHTTPRequestHandler):
                                    report_id=query.get("report", [""])[0],
                                    token=self._token_value(query)))
                 elif path == "/health":
-                    self._json({"status": "ok", "version": "0.8.0"})
+                    self._json({"status": "ok", "version": "0.9.0"})
                 elif path == "/feed.xml":
                     # Published-only Atom feed (M8): the review gate, not
                     # ingestion, decides what appears here.
@@ -125,6 +126,10 @@ class Handler(BaseHTTPRequestHandler):
                             store.list_published_reports(conn, limit=50)]
                     self._send(200, feeds.atom_feed(rows),
                                "application/atom+xml; charset=utf-8")
+                elif path == "/api/sources/health":
+                    items = evaluate_sources(
+                        [dict(r) for r in store.list_sources(conn)])
+                    self._json(summarize(items))
                 elif path == "/api/sources":
                     self._json([dict(r) for r in store.list_sources(conn)])
                 elif path == "/api/reports":
@@ -164,7 +169,7 @@ class Handler(BaseHTTPRequestHandler):
         return query.get("token", [""])[0]
 
     def _dashboard(self, conn) -> None:
-        sources = [dict(r) for r in store.list_sources(conn)]
+        sources = with_health([dict(r) for r in store.list_sources(conn)])
         reports = [dict(r) for r in store.list_reports(conn, limit=5)]
         pending = store.count_review_tasks_by_status(conn).get("pending", 0)
         runs = [dict(r) for r in store.latest_runs(conn, limit=20)]

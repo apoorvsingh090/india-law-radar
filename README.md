@@ -5,10 +5,11 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
 Source-verifiable monitoring of official Indian legal documents.
-**Milestone 8 (this release):** the radar loop — `lawradar watch`
-sweeps due sources on their poll schedule (cron-friendly `--once`),
-and `/feed.xml` serves an Atom feed of **approved** reports only, so
-readers can subscribe without trusting unpublished drafts. Includes the
+**Milestone 9 (this release):** source health — `lawradar sources
+health` and `/api/sources/health` separate "configured" from "actually
+succeeding", flag stale/failing sweeps, and exit 1 for schedulers. The
+dashboard and sources page show the same status. Builds on the M8 radar
+loop (`lawradar watch`, Atom feed of **approved** reports) and the
 real-source pilot runbook (`docs/pilot.md`). Still zero paid
 dependencies.
 
@@ -40,20 +41,22 @@ pytest
 # 6. Start the web UI (loopback only)
 lawradar serve
 # open http://127.0.0.1:8080 — dashboard, changes, report detail,
-# search, sources, review queue, coverage, Atom feed (/feed.xml,
-# approved reports only). Use --token for review POSTs if binding
+# search, sources with health badges, review queue, coverage, Atom feed
+# (/feed.xml, approved reports only). Use --token for review POSTs if binding
 # beyond loopback (serve refuses otherwise).
 ```
 
 Expected: `lawradar health` prints `health: OK` with three PASS lines;
 `pytest` passes (unit + integration).
 
-## CLI (Milestone 8)
+## CLI (Milestone 9)
 
 ```text
 lawradar init [--force]        dirs + config + migrate sqlite schema
 lawradar health [--json]       config + data-dir + sqlite checks (no network)
 lawradar sources list          registry with check timestamps
+lawradar sources health        ok/due/stale/failing per source
+                               (exit 1 if a monitored source is stale or failing)
 lawradar sources check <id>    registry probe for one source
 lawradar ingest <source-id>    ingest fixture / manual / http-probe source
 lawradar ingest --all          ingest all enabled sources
@@ -95,10 +98,10 @@ and `.env.example`.
 ```text
 config/        example YAML (local settings.yaml is git-ignored)
 docs/          architecture, data-model, source-policy, evaluation, limitations,
-               pilot runbook (real-source operation, M8)
-src/lawradar/  cli, config, logging, db/store, sources/*, ingestion/*,
-               extraction/*, diffing/*, reporting/*, review/*, ai/*,
-               search/fts, web/* (incl. Atom feed), evaluation/*
+               pilot runbook (real-source operation, M8-9)
+src/lawradar/  cli, config, logging, db/store, sources/*, ingestion/*
+               (watch, health), extraction/*, diffing/*, reporting/*,
+               review/*, ai/*, search/fts, web/* (incl. Atom feed), evaluation/*
 migrations/    001-004 (schema, ai_attempts, FTS index, feedback)
 tests/         unit + integration + fixtures + evaluation notes
 scripts/       operator helpers (probe script; daily pilot loop is CLI-only)
@@ -114,7 +117,8 @@ data/          local-only runtime data (git-ignored except README/.gitkeep)
 - M5: web UI, FTS search, JSON API (done)
 - M6: pilot adapters, evaluation set, coverage + runbook (done)
 - M7: beta hardening, feedback loop, deployment docs (done)
-- M8: watch sweeps, Atom feed of approved reports, pilot runbook (done here)
+- M8: watch sweeps, Atom feed of approved reports, pilot runbook (done)
+- M9: source health/staleness, dashboard + API signals, scheduler exit code (done here)
 
 ## Safeguards
 

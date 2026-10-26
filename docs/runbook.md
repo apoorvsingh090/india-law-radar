@@ -1,8 +1,10 @@
-# Runbook: failures and reprocessing (Milestone 6)
+# Runbook: failures and reprocessing
 
 ## Where to look
 
 - CLI output + `lawradar health` (config, data dir, sqlite + migrations)
+- `lawradar sources health` — `ok`/`due`/`stale`/`failing` per source,
+  next-due times, exit 1 when a monitored source needs attention
 - `lawradar sources list` — per-source `last_error`, `last_check`
 - `lawradar review --list` — human-actionable queue
 - Dashboard `/` — ingestion failures + coverage warnings section
@@ -25,6 +27,9 @@
 | `watch` skips a source (`not due until …`) | poll interval not elapsed | Nothing to do — the schedule is working; force with `lawradar ingest <id>` if you must |
 | `watch` skips a source (`manual_import`) | by design | Humans supply the file: `lawradar ingest <id> --file PATH` (see `docs/pilot.md`) |
 | `/feed.xml` missing an expected report | report not approved yet | `review --list`, then `--approve` with notes — the feed only ever lists published reports |
+| `sources health` → `FAILED` (`stale`) | no successful sweep within `2 x poll_interval` (min 15m) | Check the scheduler/watch log, then `lawradar ingest <id>` once. If it succeeds, health clears; if not, apply the matching error row above |
+| `sources health` → `failing` | the most recent check recorded `last_error` | Fix the cause, re-run `lawradar ingest <id>` (or wait for the next sweep) — success clears the error |
+| `sources health` ignores a source | `manual` or `disabled` | By design: only enabled automated sources affect the exit code. Manual files still need `lawradar ingest <id> --file PATH` |
 
 ## Reprocessing recipes
 

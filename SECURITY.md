@@ -41,4 +41,4 @@ Out of scope:
 
 ## Supported versions
 
-Only the latest code on `main` (currently `0.8.0`) is supported.
+Only the latest code on `main` (currently `0.9.0`) is supported.

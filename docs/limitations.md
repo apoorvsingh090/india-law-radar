@@ -1,10 +1,13 @@
-# Limitations (public disclosure — Milestone 8)
+# Limitations (public disclosure — Milestone 9)
 
 - Coverage: only the sources shown on `/sources` that are actually ingested.
   The pilot set is small (see `docs/coverage.md`); no completeness claim is made.
 - Currency: sweeps follow each source's `poll_interval_minutes`. A skipped or
-  failed sweep is visible in `lawradar watch` output, the coverage page, and
-  the source's last error — silence is not proof that nothing changed.
+  failed sweep is visible in `lawradar watch` output, `lawradar sources health`
+  (stale after `2 x poll_interval`, min 15m; exit 1), the dashboard/sources
+  page, `/api/sources/health`, and the source's last error — silence is not
+  proof that nothing changed. Health means "the sweep ran", not "coverage is
+  complete".
 - Publication: reports stay drafts until a human approves them. `/feed.xml`
   lists approved reports only; ingestion and AI output cannot publish.
 - AI: the summariser is optional (heuristic by default, external command

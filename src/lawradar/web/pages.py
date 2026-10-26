@@ -37,6 +37,12 @@ def snippet_html(snippet: str) -> str:
     return out.replace("&lt;b&gt;", "<b>").replace("&lt;/b&gt;", "</b>")
 
 
+def health_badge(status: str) -> str:
+    cls = {"ok": "ok", "due": "warn", "stale": "bad",
+           "failing": "bad"}.get(status, "")
+    return (f"<span class=\"badge {cls}\">{esc(status)}</span>")
+
+
 def layout(title: str, body: str) -> str:
     return (
         "<!DOCTYPE html><html lang=\"en\"><head><meta charset=\"utf-8\">"
@@ -63,15 +69,12 @@ def layout(title: str, body: str) -> str:
 def dashboard(ctx: dict) -> str:
     rows = []
     for source in ctx["sources"]:
-        state = ("ok" if source["last_success_at"] else
-                 ("bad" if source["last_error"] else "warn"))
         rows.append(
             f"<tr><td>{esc(source['id'])}</td>"
             f"<td>{esc(source['name'])}</td>"
-            f"<td><span class=\"badge {state}\">"
-            f"{'ok' if source['last_success_at'] else 'never checked ok'}</span></td>"
-            f"<td>{esc(source['last_success_at'] or '—')}</td>"
-            f"<td>{esc(source['last_error'] or '—')}</td></tr>")
+            f"<td>{health_badge(source.get('status', 'unknown'))}</td>"
+            f"<td>{esc(source.get('health_detail') or '—')}</td>"
+            f"<td>{esc(source['last_success_at'] or '—')}</td></tr>")
     recent = "".join(
         f"<li><a href=\"/reports/{r['id']}\">{esc(r['document_title'])}</a> "
         f"<span class=\"badge\">{esc(r['change_type'])}</span> "
@@ -82,12 +85,15 @@ def dashboard(ctx: dict) -> str:
         for r in ctx["failed_runs"]) or "<li>None recorded.</li>"
     gaps = "".join(
         f"<li>{esc(g)}</li>" for g in ctx["coverage_gaps"]) or "<li>None.</li>"
+    monitored = sum(1 for s in ctx["sources"] if s.get("monitored"))
+    unhealthy = sum(1 for s in ctx["sources"] if not s.get("healthy", True))
     return (
         f"<p>{ctx['source_count']} configured sources · "
+        f"{monitored} monitored, {unhealthy} need attention · "
         f"{ctx['pending_review']} pending reviews · "
         f"{ctx['unpublished']} unpublished reports</p>"
         "<h3>Sources</h3><table><tr><th>ID</th><th>Name</th><th>State</th>"
-        "<th>Last success</th><th>Last error</th></tr>"
+        "<th>Health detail</th><th>Last success</th></tr>"
         + "".join(rows) + "</table>"
         + "<h3>Recent changes</h3><ul>" + (recent or "<li>None yet.</li>") + "</ul>"
         + "<h3>Ingestion failures</h3><ul>" + failures + "</ul>"
@@ -98,7 +104,7 @@ def changes_feed(reports: list[dict], filters: dict,
                  options: dict) -> str:
     def _opts(name: str, values: list[str]) -> str:
         current = filters.get(name, "")
-        items = [f"<option value=\"\">all</option>"] + [
+        items = ["<option value=\"\">all</option>"] + [
             f"<option value=\"{esc(v)}\"{' selected' if v == current else ''}>"
             f"{esc(v)}</option>" for v in values]
         return (f"<label>{esc(name)} <select name=\"{esc(name)}\">"
@@ -232,6 +238,9 @@ def sources_page(sources: list[dict]) -> str:
         f"<td><a href=\"{esc(s['base_url'])}\">{esc(s['base_url'])}</a></td>"
         f"<td>{esc(s['access_method'])}</td><td>{esc(s['jurisdiction'])}</td>"
         f"<td>{'yes' if s['enabled'] else 'no'}</td>"
+        f"<td>{health_badge(s.get('status', 'unknown'))}</td>"
+        f"<td>{esc(s.get('next_due_at') or '—')}</td>"
+        f"<td>{esc(s.get('health_detail') or '—')}</td>"
         f"<td>{esc(s['terms_review_status'])}</td>"
         f"<td>{esc(s['last_checked_at'] or '—')}</td>"
         f"<td>{esc(s['last_success_at'] or '—')}</td>"
@@ -239,7 +248,8 @@ def sources_page(sources: list[dict]) -> str:
         f"<td>{esc(s['coverage_notes'])}</td></tr>"
         for s in sources)
     return ("<table><tr><th>ID</th><th>Name</th><th>Base URL</th><th>Method</th>"
-            "<th>Jurisdiction</th><th>Enabled</th><th>Terms</th>"
+            "<th>Jurisdiction</th><th>Enabled</th><th>Status</th>"
+            "<th>Next due</th><th>Health detail</th><th>Terms</th>"
             "<th>Last check</th><th>Last success</th><th>Error</th>"
             "<th>Coverage</th></tr>" + rows + "</table>")
 

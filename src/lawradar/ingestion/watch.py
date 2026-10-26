@@ -16,27 +16,12 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 
 from lawradar.db import store
+from lawradar.ingestion.health import parse_utc, utc_now
 from lawradar.ingestion.pipeline import _db_path, ingest_source, sync_registry
 from lawradar.sources.registry import SourceRecord, load_sources
-
-EPOCH_STAMP = "1970-01-01T00:00:00.000Z"
-
-
-def utc_now() -> datetime:
-    return datetime.now(timezone.utc)
-
-
-def parse_utc(text: str | None) -> datetime | None:
-    """Parse the store's ``%Y-%m-%dT%H:%M:%fZ`` stamps; None when absent."""
-    if not text:
-        return None
-    try:
-        return datetime.fromisoformat(text.replace("Z", "+00:00"))
-    except ValueError:
-        return None
 
 
 def is_due(source: SourceRecord, last_checked: str | None,

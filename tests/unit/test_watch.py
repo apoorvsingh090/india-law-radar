@@ -59,6 +59,13 @@ def test_due_after_interval():
     assert due
 
 
+def test_daily_cron_starting_seconds_early_is_still_due():
+    stamp = (NOW - timedelta(minutes=1440) + timedelta(seconds=5)).strftime(
+        "%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
+    due, _ = is_due(_source(), stamp, NOW)
+    assert due
+
+
 def test_manual_and_disabled_never_due():
     due, reason = is_due(_source(access_method="manual_import"), None, NOW)
     assert not due and "operator file" in reason
@@ -99,6 +106,22 @@ def test_sweep_ingests_then_respects_interval(tmp_path, monkeypatch):
     assert third.ingested == ["fx"]
     assert third.changed == 0
     assert all(run["status"] == "success" for run in third.runs)
+
+
+def test_transient_db_error_does_not_kill_sweep(tmp_path, monkeypatch):
+    import sqlite3
+
+    config, sources_file = _setup(tmp_path, monkeypatch, [FIXTURE])
+
+    def _boom(*_args, **_kwargs):
+        raise sqlite3.OperationalError("database is locked")
+
+    monkeypatch.setattr("lawradar.ingestion.watch.ingest_source", _boom)
+    result = run_sweep(config, sources_file,
+                       now=datetime.now(timezone.utc))
+    assert result.ingested == ["fx"]
+    assert result.failed == 1
+    assert result.runs[0]["errors"] == ["database is locked"]
 
 
 def test_run_watch_loop_injectable_sleep(tmp_path, monkeypatch):

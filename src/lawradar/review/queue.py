@@ -84,12 +84,12 @@ def resolve(conn, *, report_id: int, decision: str, reviewer: str = "",
         store.publish_report(conn, report_id, reviewer_notes=notes.strip())
         verification = "approved"
     elif decision == "rejected":
-        store.set_report_verification(conn, report_id, "rejected",
-                                      reviewer_notes=notes.strip())
+        store.unpublish_report(conn, report_id, "rejected",
+                               reviewer_notes=notes.strip())
         verification = "rejected"
     else:
-        store.set_report_verification(conn, report_id, "needs_changes",
-                                      reviewer_notes=notes.strip())
+        store.unpublish_report(conn, report_id, "needs_changes",
+                               reviewer_notes=notes.strip())
         verification = "needs_changes"
     conn.commit()
     return {"report_id": report_id, "decision": decision,

@@ -73,6 +73,7 @@ def upsert_source(conn: sqlite3.Connection, record) -> None:
              terms_review_status=excluded.terms_review_status,
              poll_interval_minutes=excluded.poll_interval_minutes,
              enabled=excluded.enabled, coverage_notes=excluded.coverage_notes,
+             retired_at=NULL,
              updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now')""",
         (
             record.id, record.name, record.base_url, record.source_type,
@@ -81,6 +82,25 @@ def upsert_source(conn: sqlite3.Connection, record) -> None:
             1 if record.enabled else 0, record.coverage_notes,
         ),
     )
+
+
+def retire_missing_sources(conn: sqlite3.Connection,
+                           active_ids: set[str]) -> int:
+    """Soft-retire DB sources no longer present in the loaded registry."""
+    if active_ids:
+        placeholders = ",".join("?" for _ in active_ids)
+        cursor = conn.execute(
+            f"""UPDATE sources SET retired_at=strftime('%Y-%m-%dT%H:%M:%fZ','now'),
+                updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now')
+                WHERE retired_at IS NULL AND id NOT IN ({placeholders})""",
+            tuple(sorted(active_ids)),
+        )
+    else:
+        cursor = conn.execute(
+            """UPDATE sources SET retired_at=strftime('%Y-%m-%dT%H:%M:%fZ','now'),
+               updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now')
+               WHERE retired_at IS NULL""")
+    return cursor.rowcount
 
 
 def list_sources(conn: sqlite3.Connection) -> list[sqlite3.Row]:
@@ -393,6 +413,7 @@ def list_published_reports(
         "SELECT r.*, d.title AS document_title FROM change_reports r "
         "JOIN documents d ON d.id=r.document_id "
         "WHERE r.published_at IS NOT NULL "
+        "AND r.verification_status='approved' "
         "ORDER BY r.published_at DESC, r.id DESC LIMIT ?", (limit,)))
 
 
@@ -515,6 +536,18 @@ def publish_report(
            reviewer_notes=?,
            published_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id=?""",
         (reviewer_notes[:4000], report_id),
+    )
+
+
+def unpublish_report(
+    conn: sqlite3.Connection, report_id: int, verification: str,
+    reviewer_notes: str = "",
+) -> None:
+    """Reverse a publication after a later non-approved review decision."""
+    conn.execute(
+        """UPDATE change_reports SET verification_status=?, reviewer_notes=?,
+           published_at=NULL WHERE id=?""",
+        (verification, reviewer_notes[:4000], report_id),
     )
 
 

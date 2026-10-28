@@ -54,6 +54,30 @@ def test_approve_publishes(db):
     assert len(trail) == 1 and trail[0]["reviewer"] == "A. Reviewer"
 
 
+def test_reject_after_approval_removes_publication(db):
+    conn, _, _, rep = db
+    resolve(conn, report_id=rep, decision="approved", notes="first pass")
+    assert store.get_report(conn, rep)["published_at"]
+    assert [r["id"] for r in store.list_published_reports(conn)] == [rep]
+    resolve(conn, report_id=rep, decision="rejected",
+            notes="later evidence contradicts it")
+    row = store.get_report(conn, rep)
+    assert row["verification_status"] == "rejected"
+    assert row["published_at"] is None
+    assert store.list_published_reports(conn) == []
+
+
+def test_resummarise_refuses_published_report(db):
+    from types import SimpleNamespace
+
+    from lawradar.reporting.summarise import resummarise
+
+    conn, _, _, rep = db
+    resolve(conn, report_id=rep, decision="approved", notes="checked")
+    with pytest.raises(ValueError, match="published report"):
+        resummarise(conn, SimpleNamespace(ai_enabled=False), rep)
+
+
 def test_reject_requires_notes(db):
     conn, _, _, rep = db
     with pytest.raises(ReviewError, match="notes are required"):

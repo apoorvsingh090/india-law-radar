@@ -80,9 +80,10 @@ def _get(base, path):
         return exc.code, exc.read().decode("utf-8", "replace")
 
 
-def _post(base, path, fields):
+def _post(base, path, fields, headers=None):
     data = urllib.parse.urlencode(fields).encode()
-    req = urllib.request.Request(base + path, data=data, method="POST")
+    req = urllib.request.Request(base + path, data=data, method="POST",
+                                 headers=headers or {})
     try:
         with urllib.request.urlopen(req, timeout=10) as resp:
             return resp.status, resp.read().decode("utf-8")
@@ -188,6 +189,51 @@ def test_review_post_token_gated(live):
     conn = store.connect(tmp_path / "data" / "lawradar.db")
     try:
         assert store.get_report(conn, rid)["published_at"]
+    finally:
+        conn.close()
+
+
+def test_cross_origin_review_post_is_rejected(live):
+    base, tmp_path = live
+    conn = store.connect(tmp_path / "data" / "lawradar.db")
+    rid = next(r["id"] for r in store.list_reports(conn)
+               if r["change_type"] == "text_modified")
+    conn.close()
+    status, _ = _post(
+        base, f"/reports/{rid}/review",
+        {"decision": "approved", "token": "secret", "reviewer": "evil"},
+        headers={"Origin": "https://evil.example",
+                 "Sec-Fetch-Site": "cross-site"})
+    assert status == 403
+    conn = store.connect(tmp_path / "data" / "lawradar.db")
+    try:
+        assert store.get_report(conn, rid)["published_at"] is None
+    finally:
+        conn.close()
+    # A loopback Host is required on a loopback bind (DNS rebinding).
+    status, _ = _post(
+        base, f"/reports/{rid}/review",
+        {"decision": "approved", "token": "secret"},
+        headers={"Host": "evil.example"})
+    assert status == 403
+
+
+def test_feedback_is_public_but_same_origin(live):
+    base, tmp_path = live
+    status, _ = _post(
+        base, "/feedback",
+        {"message": "The commencement date looks wrong", "report_id": "1"},
+        headers={"Origin": "https://evil.example"})
+    assert status == 403
+    status, body = _post(
+        base, "/feedback",
+        {"message": "The commencement date looks wrong", "report_id": "1"})
+    assert status == 200 and "recorded" in body
+    conn = store.connect(tmp_path / "data" / "lawradar.db")
+    try:
+        feedback = store.list_feedback(conn)
+        assert len(feedback) == 1
+        assert feedback[0]["message"].startswith("The commencement")
     finally:
         conn.close()
 

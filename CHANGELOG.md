@@ -5,6 +5,42 @@ All notable changes to India Law Radar will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.0] - 2026-10-28
+
+### Added
+
+- Milestone 10 (verifiable backups): `lawradar backup create` writes a
+  consistent SQLite snapshot plus a SHA-256 sidecar and JSON manifest
+  (counts, migrations, source path); `--keep N` prunes older snapshots
+- `lawradar backup verify PATH` fails closed: sidecar checksum, SQLite
+  `integrity_check`, foreign keys, required tables, manifest counts and
+  migration names must all match before a backup is trusted
+- `lawradar backup restore PATH --force` verifies the snapshot first,
+  writes a `lawradar-pre-restore-*` safety backup of the current DB, and
+  replaces it atomically (stale `-wal`/`-shm`/`-journal` removed)
+- `db/backup.py` (stdlib only) with unit + CLI round-trip tests and
+  `docs/backup.md` (schedule, restore drill, offsite rules)
+
+### Fixed
+
+- Audit hardening: backup retention never deletes the snapshot it just
+  created (clock skew), the JSON manifest is required, stale `-journal`
+  files are removed, and partial/restore temp names are collision-safe
+- Publication integrity: rejecting or requesting changes after approval
+  clears `published_at`, the feed requires `verification_status='approved'`,
+  and re-summarising a published report is refused
+- Web POSTs reject cross-origin/DNS-rebinding requests; `/feedback` is
+  public without the review token and no longer copies message text into
+  the review-task audit trail; malformed `Content-Length` returns 400
+- Watch allows a small early-cron grace window and contains per-source
+  SQLite/OS errors so one transient lock cannot stop the daemon
+- Health treats an invalid/missing `created_at` as stale instead of
+  disabling the never-successful alarm; sources removed from the registry
+  are soft-retired (`sources.retired_at`, migration `005`) so they stop
+  alerting forever while their history stays intact
+- `serve`/`watch` hold a runtime lock and `backup restore` requires it,
+  preventing POSIX split-brain during a live restore
+
 ## [0.9.0] - 2026-10-26
 
 ### Added

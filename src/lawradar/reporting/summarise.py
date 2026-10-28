@@ -91,6 +91,10 @@ def resummarise(conn, config, report_id: int,
     report = store.get_report(conn, report_id)
     if report is None:
         raise ValueError(f"unknown report id {report_id}")
+    if report["published_at"]:
+        raise ValueError(
+            "refusing to re-summarise a published report; create a new "
+            "draft/revision and approve it explicitly")
     attempts = json.loads(report["ai_attempts"] or "[]")
     draft, evidence = draft_view(conn, report_id)
     if use_ai:

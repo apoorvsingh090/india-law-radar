@@ -34,6 +34,12 @@ def _row(**overrides) -> dict:
     return row
 
 
+def test_retired_source_is_not_monitored_or_unhealthy():
+    health = evaluate_source(_row(retired_at=_ts(1)), NOW)
+    assert health.status == "retired"
+    assert health.healthy and not health.monitored
+
+
 def test_disabled_and_manual_are_not_monitored():
     disabled = evaluate_source(_row(enabled=0, last_error="old failure"), NOW)
     assert disabled.status == "disabled"
@@ -49,6 +55,12 @@ def test_never_checked_is_due_when_fresh_but_stale_when_old():
     assert fresh.status == "due" and fresh.healthy
     old = evaluate_source(_row(created_at=_ts(300)), NOW)
     assert old.status == "stale" and not old.healthy
+
+
+def test_invalid_created_at_cannot_disable_stale_alarm():
+    health = evaluate_source(_row(created_at="garbage"), NOW)
+    assert health.status == "stale" and not health.healthy
+    assert "registration time is invalid" in health.detail
 
 
 def test_ok_and_next_due():

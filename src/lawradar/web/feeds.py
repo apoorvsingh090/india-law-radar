@@ -16,8 +16,19 @@ FEED_AUTHOR = "India Law Radar"
 EPOCH_STAMP = "1970-01-01T00:00:00.000Z"
 
 
+def _clean(value: str) -> str:
+    """Drop characters XML 1.0 cannot represent (e.g. form feed)."""
+    return "".join(
+        ch for ch in str(value)
+        if ch in "\t\n\r"
+        or 0x20 <= ord(ch) <= 0xD7FF
+        or 0xE000 <= ord(ch) <= 0xFFFD
+        or 0x10000 <= ord(ch) <= 0x10FFFF
+    )
+
+
 def _attr(value: str) -> str:
-    return escape(value, {'"': "&quot;", "'": "&apos;"})
+    return escape(_clean(value), {'"': "&quot;", "'": "&apos;"})
 
 
 def atom_feed(reports: list[dict]) -> str:
@@ -42,11 +53,11 @@ def atom_feed(reports: list[dict]) -> str:
         entries.append(
             "<entry>"
             f"<id>urn:lawradar:report:{report.get('id')}</id>"
-            f"<title>{escape(title)}</title>"
+            f"<title>{escape(_clean(title))}</title>"
             f"<updated>{_attr(str(report.get('published_at') or EPOCH_STAMP))}</updated>"
             f"<link rel=\"alternate\" type=\"text/html\" "
             f"href=\"{_attr(link)}\"/>"
-            f"<summary>{escape(summary)}</summary>"
+            f"<summary>{escape(_clean(summary))}</summary>"
             "</entry>"
         )
     return (

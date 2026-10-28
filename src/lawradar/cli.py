@@ -1,4 +1,4 @@
-"""Command-line interface for India Law Radar (Milestone 9).
+"""Command-line interface for India Law Radar (Milestone 10).
 
 Implemented commands (all functional, no placeholders):
   lawradar init              — create data dir, local settings.yaml, migrate db
@@ -20,6 +20,9 @@ Implemented commands (all functional, no placeholders):
   lawradar serve [--host 127.0.0.1] [--port 8080] [--token ...]
   lawradar eval                run the curated pilot evaluation set
   lawradar feedback list       triage user error reports
+  lawradar backup create       verified SQLite snapshot + checksum + manifest
+  lawradar backup verify PATH  fail closed unless integrity/checksum agree
+  lawradar backup restore PATH --force  safety-snapshot, then restore
 """
 from __future__ import annotations
 
@@ -172,6 +175,27 @@ def build_parser() -> argparse.ArgumentParser:
     p_flist.add_argument("--limit", type=int, default=50)
     p_fresolve = feedback_sub.add_parser("resolve", help="Mark resolved")
     p_fresolve.add_argument("feedback_id", type=int)
+
+    p_backup = sub.add_parser(
+        "backup", help="Create/verify/restore verified SQLite backups")
+    backup_sub = p_backup.add_subparsers(
+        dest="backup_command", required=True)
+    p_bcreate = backup_sub.add_parser(
+        "create", help="Snapshot the database + checksum + manifest")
+    p_bcreate.add_argument(
+        "--out", default=None, help="Directory (default: <db dir>/backups)")
+    p_bcreate.add_argument(
+        "--keep", type=int, default=0,
+        help="Keep only N recent lawradar backups in --out (0 = keep all)")
+    p_bverify = backup_sub.add_parser(
+        "verify", help="Read-only checksum/integrity/manifest check")
+    p_bverify.add_argument("backup_path", help="Path to the .db backup")
+    p_brestore = backup_sub.add_parser(
+        "restore", help="Verify, safety-snapshot, then atomically replace")
+    p_brestore.add_argument("backup_path", help="Path to the .db backup")
+    p_brestore.add_argument(
+        "--force", action="store_true",
+        help="Required when the target database already exists")
     return parser
 
 
@@ -238,7 +262,7 @@ def cmd_init(args: argparse.Namespace) -> int:
     return 0
 
 
-APP_LABEL = "India Law Radar v0.9.0 (Milestone 9)"
+APP_LABEL = "India Law Radar v0.10.0 (Milestone 10)"
 
 
 def _sqlite_path(db_url: str, data_dir: Path) -> Path | None:
@@ -385,7 +409,8 @@ def cmd_sources(args: argparse.Namespace) -> int:
         if not rows:
             print("No sources configured. See config/sources.example.yaml.")
         for r in rows:
-            state = "enabled" if r["enabled"] else "disabled"
+            state = ("retired" if r["retired_at"]
+                     else "enabled" if r["enabled"] else "disabled")
             print(f"- {r['id']} [{state}] {r['name']}")
             print(f"  {r['base_url']} | {r['access_method']} | {r['jurisdiction']} "
                   f"| terms={r['terms_review_status']}")
@@ -436,6 +461,7 @@ def cmd_ingest(args: argparse.Namespace) -> int:
 
 
 def cmd_watch(args: argparse.Namespace) -> int:
+    from lawradar.db.lock import LockBusy
     from lawradar.ingestion.watch import run_watch
 
     config = _effective_config(args)
@@ -470,6 +496,9 @@ def cmd_watch(args: argparse.Namespace) -> int:
     except KeyboardInterrupt:
         print("watch interrupted; finished cleanly")
         return 0
+    except LockBusy as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
     if args.json:
         print(json.dumps([r.to_dict() for r in results], indent=2))
     # A failed sweep is fatal only in --once mode (schedulers retry);
@@ -708,6 +737,7 @@ def cmd_review(args: argparse.Namespace) -> int:
 
 def cmd_serve(args: argparse.Namespace) -> int:
     from lawradar.db import store
+    from lawradar.db.lock import LockBusy
     from lawradar.ingestion.pipeline import _db_path
     from lawradar.web.server import serve_forever
 
@@ -719,9 +749,13 @@ def cmd_serve(args: argparse.Namespace) -> int:
               "review POSTs would be unprotected. Set --token or use a "
               "reverse proxy with authentication.", file=sys.stderr)
         return 2
-    serve_forever(str(_db_path(config)), host=args.host, port=args.port,
-                  token=args.token,
-                  post_limit_per_minute=config.post_limit_per_minute)
+    try:
+        serve_forever(str(_db_path(config)), host=args.host, port=args.port,
+                      token=args.token,
+                      post_limit_per_minute=config.post_limit_per_minute)
+    except LockBusy as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
     return 0
 
 
@@ -781,6 +815,71 @@ def cmd_feedback(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_backup(args: argparse.Namespace) -> int:
+    from lawradar.db.backup import (
+        BackupError,
+        create_backup,
+        restore_backup,
+        verify_backup,
+    )
+    from lawradar.ingestion.pipeline import _db_path
+
+    try:
+        if args.backup_command == "verify":
+            info = verify_backup(args.backup_path)
+            if args.json:
+                print(json.dumps(info.to_dict(), indent=2))
+            else:
+                print(f"backup: OK {info.name}")
+                print(f"  sha256: {info.sha256}")
+                print(f"  created_at: {info.created_at}")
+                print(f"  manifest: {'yes' if info.has_manifest else 'no'}")
+                print("  counts: " + ", ".join(
+                    f"{key}={value}" for key, value in info.counts.items()))
+            return 0
+        config = _effective_config(args)
+        setup_logging(config.log_level, config.log_file)
+        db_path = _db_path(config)
+        if args.backup_command == "create":
+            if args.keep < 0:
+                print("--keep must be >= 0", file=sys.stderr)
+                return 2
+            out_dir = args.out or (db_path.parent / "backups")
+            info = create_backup(db_path, out_dir, keep=args.keep)
+            if args.json:
+                print(json.dumps(info.to_dict(), indent=2))
+            else:
+                print(f"backup: {info.path}")
+                print(f"  sha256: {info.sha256}")
+                print(f"  bytes: {info.bytes}")
+                print("  counts: " + ", ".join(
+                    f"{key}={value}" for key, value in info.counts.items()))
+                if args.keep:
+                    print(f"  retention: kept {args.keep} most recent")
+            return 0
+        result = restore_backup(
+            args.backup_path, db_path,
+            force=args.force,
+            safety_dir=db_path.parent / "backups")
+        if args.json:
+            print(json.dumps(result, indent=2))
+        else:
+            print(f"restored: {result['target']}")
+            print(f"  from: {result['restored_from']}")
+            print(f"  sha256: {result['sha256']}")
+            if result["safety_backup"]:
+                label = ("safety backup (unverified)"
+                         if "-unverified-" in Path(result["safety_backup"]).name
+                         else "safety backup")
+                print(f"  {label}: {result['safety_backup']}")
+            print("  counts: " + ", ".join(
+                f"{key}={value}" for key, value in result["counts"].items()))
+        return 0
+    except (BackupError, OSError, sqlite3.Error) as exc:
+        print(f"backup failed: {exc}", file=sys.stderr)
+        return 1
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
@@ -806,6 +905,8 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_eval(args)
     if args.command == "feedback":
         return cmd_feedback(args)
+    if args.command == "backup":
+        return cmd_backup(args)
     parser.error(f"unknown command: {args.command}")
     return 2
 

@@ -5,12 +5,13 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
 Source-verifiable monitoring of official Indian legal documents.
-**Milestone 9 (this release):** source health — `lawradar sources
-health` and `/api/sources/health` separate "configured" from "actually
-succeeding", flag stale/failing sweeps, and exit 1 for schedulers. The
-dashboard and sources page show the same status. Builds on the M8 radar
-loop (`lawradar watch`, Atom feed of **approved** reports) and the
-real-source pilot runbook (`docs/pilot.md`). Still zero paid
+**Milestone 10 (this release):** verifiable backups - `lawradar backup
+create` writes a SQLite snapshot plus SHA-256 sidecar and JSON manifest;
+`backup verify` fails closed on tampering or a missing sidecar; `backup
+restore` verifies first, snapshots the current DB, and swaps atomically
+with `--force`. Builds on M9 source health (`lawradar sources health`,
+stale/failing sweeps exit 1), the M8 radar loop (`lawradar watch`, Atom
+feed of **approved** reports), and `docs/pilot.md`. Still zero paid
 dependencies.
 
 > Scope honesty: this MVP does **not** claim complete coverage of Indian law,
@@ -49,7 +50,7 @@ lawradar serve
 Expected: `lawradar health` prints `health: OK` with three PASS lines;
 `pytest` passes (unit + integration).
 
-## CLI (Milestone 9)
+## CLI (Milestone 10)
 
 ```text
 lawradar init [--force]        dirs + config + migrate sqlite schema
@@ -76,6 +77,9 @@ lawradar review <id> --approve|--reject|--changes --reviewer R --notes "…"
 lawradar serve [--host 127.0.0.1] [--port 8080] [--token ...]
 lawradar eval                  curated pilot evaluation set (expect 7/7)
 lawradar feedback list         triage user error reports
+lawradar backup create [--out DIR] [--keep N]  snapshot + checksum + manifest
+lawradar backup verify PATH    integrity, schema, manifest, checksum (exit 1)
+lawradar backup restore PATH --force  verify, safety-snapshot, atomic replace
 lawradar --help                full usage
 ```
 
@@ -84,9 +88,10 @@ approves them; rejections and change-requests require notes. AI output
 can never bypass schema validation — malformed JSON or invented
 citations are rejected and recorded as failed attempts.
 
-Try without network: `lawradar ingest fixture-sample` twice — the second
-run reports `changed=0` (idempotent dedup). All fixture titles carry a
-`[FIXTURE]` marker and must never be presented as real legal findings.
+Try without network: `lawradar ingest fixture-sample --sources-file
+config/sources.example.yaml` twice — the second run reports `changed=0`
+(idempotent dedup). All fixture titles carry a `[FIXTURE]` marker and
+must never be presented as real legal findings.
 
 Overrides: `--config PATH`, `--data-dir DIR`, `--log-level LEVEL`,
 or env vars `LAWRADAR_CONFIG`, `LAWRADAR_DATA_DIR`, `LAWRADAR_DB_URL`,
@@ -98,11 +103,12 @@ and `.env.example`.
 ```text
 config/        example YAML (local settings.yaml is git-ignored)
 docs/          architecture, data-model, source-policy, evaluation, limitations,
-               pilot runbook (real-source operation, M8-9)
-src/lawradar/  cli, config, logging, db/store, sources/*, ingestion/*
-               (watch, health), extraction/*, diffing/*, reporting/*,
-               review/*, ai/*, search/fts, web/* (incl. Atom feed), evaluation/*
-migrations/    001-004 (schema, ai_attempts, FTS index, feedback)
+               pilot runbook (real-source operation, M8-10), backup/restore (M10)
+src/lawradar/  cli, config, logging, db/store + db/backup, sources/*,
+               ingestion/* (watch, health), extraction/*, diffing/*,
+               reporting/*, review/*, ai/*, search/fts, web/* (incl. Atom
+               feed), evaluation/*
+migrations/    001-005 (schema, ai_attempts, FTS index, feedback, retirement)
 tests/         unit + integration + fixtures + evaluation notes
 scripts/       operator helpers (probe script; daily pilot loop is CLI-only)
 data/          local-only runtime data (git-ignored except README/.gitkeep)
@@ -118,7 +124,8 @@ data/          local-only runtime data (git-ignored except README/.gitkeep)
 - M6: pilot adapters, evaluation set, coverage + runbook (done)
 - M7: beta hardening, feedback loop, deployment docs (done)
 - M8: watch sweeps, Atom feed of approved reports, pilot runbook (done)
-- M9: source health/staleness, dashboard + API signals, scheduler exit code (done here)
+- M9: source health/staleness, dashboard + API signals, scheduler exit code (done)
+- M10: verifiable SQLite backups, restore with safety snapshot (done here)
 
 ## Safeguards
 

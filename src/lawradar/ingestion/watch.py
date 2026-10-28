@@ -14,6 +14,8 @@ injectable, so tests exercise the loop without real waiting.
 """
 from __future__ import annotations
 
+import logging
+import sqlite3
 import time
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
@@ -22,6 +24,8 @@ from lawradar.db import store
 from lawradar.ingestion.health import parse_utc, utc_now
 from lawradar.ingestion.pipeline import _db_path, ingest_source, sync_registry
 from lawradar.sources.registry import SourceRecord, load_sources
+
+LOG = logging.getLogger(__name__)
 
 
 def is_due(source: SourceRecord, last_checked: str | None,
@@ -36,7 +40,10 @@ def is_due(source: SourceRecord, last_checked: str | None,
     interval = timedelta(minutes=max(1, source.poll_interval_minutes))
     if last is None:
         return True, ""
-    if now >= last + interval:
+    # The completion timestamp is written after the sweep starts. A daily
+    # cron a few seconds early must still see the source as due.
+    grace = timedelta(seconds=min(60.0, max(1.0, interval.total_seconds() * 0.01)))
+    if now + grace >= last + interval:
         return True, ""
     due_at = (last + interval).strftime("%Y-%m-%dT%H:%M:%SZ")
     return False, (f"not due until {due_at} "
@@ -81,7 +88,12 @@ def run_sweep(config, sources_file: str | None = None, *, limit: int = 100,
             if not due:
                 result.skipped[source.id] = reason
                 continue
-            run = ingest_source(conn, config, source, limit=limit)
+            try:
+                run = ingest_source(conn, config, source, limit=limit)
+            except (sqlite3.Error, OSError) as exc:
+                LOG.exception("sweep failed for source %s", source.id)
+                run = {"status": "failed", "changed": 0, "failed": 1,
+                       "errors": [str(exc)]}
             result.ingested.append(source.id)
             result.runs.append(run)
         result.changed = sum(run.get("changed", 0) for run in result.runs)
@@ -100,18 +112,21 @@ def run_watch(config, sources_file: str | None = None, *, limit: int = 100,
     sweep results. ``sleep``/``now_fn``/``stop`` are injection points for
     tests and embedding.
     """
+    from lawradar.db.lock import runtime_lock
+
     clock = now_fn if now_fn is not None else utc_now
     results: list[SweepResult] = []
     sweeps = 0
-    while True:
-        if stop is not None and stop.is_set():
-            return results
-        result = run_sweep(config, sources_file, limit=limit, now=clock())
-        result.sweep = sweeps
-        results.append(result)
-        if on_sweep is not None:
-            on_sweep(result)
-        sweeps += 1
-        if max_sweeps is not None and sweeps >= max_sweeps:
-            return results
-        sleep(poll_seconds)
+    with runtime_lock(_db_path(config)):
+        while True:
+            if stop is not None and stop.is_set():
+                return results
+            result = run_sweep(config, sources_file, limit=limit, now=clock())
+            result.sweep = sweeps
+            results.append(result)
+            if on_sweep is not None:
+                on_sweep(result)
+            sweeps += 1
+            if max_sweeps is not None and sweeps >= max_sweeps:
+                return results
+            sleep(poll_seconds)

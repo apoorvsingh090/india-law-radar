@@ -342,9 +342,10 @@ def ingest_source(
 
 
 def sync_registry(conn, sources: list[SourceRecord]) -> int:
-    """Upsert registry entries into the DB. Returns count synced."""
+    """Upsert the registry and retire entries that were removed from it."""
     for source in sources:
         store.upsert_source(conn, source)
+    store.retire_missing_sources(conn, {source.id for source in sources})
     conn.commit()
     return len(sources)
 

@@ -98,6 +98,21 @@ def test_health_tracks_sweep_staleness_and_failure(env, capsys):
     assert "HTTP 503" in fx["detail"]
 
 
+def test_removed_registry_source_stops_affecting_health(env, capsys):
+    config, sources_file, db_path = env
+    assert main(["--data-dir", config.data_dir, "watch", "--once",
+                 "--sources-file", sources_file]) == 0
+    capsys.readouterr()
+    path = db_path.parent.parent / "sources-manual-only.yaml"
+    path.write_text(yaml.safe_dump({"sources": [MANUAL]}), encoding="utf-8")
+    code, payload = _health(config, str(path), capsys, as_json=True)
+    assert code == 0 and payload["healthy"] is True
+    by_id = {s["source_id"]: s for s in payload["sources"]}
+    assert by_id["fx"]["status"] == "retired"
+    assert by_id["fx"]["monitored"] is False
+    assert by_id["m"]["status"] == "manual"
+
+
 def test_sources_page_and_api_expose_health(env, capsys):
     config, sources_file, db_path = env
     assert main(["--data-dir", config.data_dir, "watch", "--once",

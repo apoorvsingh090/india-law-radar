@@ -1,4 +1,4 @@
-# Real-source pilot runbook (Milestone 8-9)
+# Real-source pilot runbook (Milestone 8-10)
 
 This is the operator procedure for running India Law Radar against real
 official sources. It exists because automation alone is not enough: the
@@ -22,6 +22,9 @@ script approve a report — humans close every loop.
   from one that silently stopped: `stale` means no success within
   `2 x poll_interval` (min 15m), `failing` means the last check errored.
   Exit 1 when a monitored source needs attention.
+- `lawradar backup create --keep 14` - verified daily snapshot; `backup
+  verify` is the trust check and `backup restore ... --force` is the
+  recovery path (`docs/backup.md`).
 
 ## Daily loop (operator)
 

@@ -76,6 +76,13 @@ def _text(value) -> str:
     return "" if value is None else str(value)
 
 
+def _field(row, key: str, default=None):
+    try:
+        return row[key]
+    except (KeyError, IndexError):
+        return default
+
+
 def _interval(row) -> int:
     try:
         return max(1, int(row["poll_interval_minutes"] or 1))
@@ -112,6 +119,9 @@ def evaluate_source(row, now: datetime | None = None) -> SourceHealth:
             last_error=last_error[:MAX_DETAIL_CHARS],
         )
 
+    if _text(_field(row, "retired_at")).strip():
+        return _make("retired", True, False,
+                     "removed from the source registry; history retained")
     if not bool(row["enabled"]):
         return _make("disabled", True, False, "disabled in registry")
     if _text(row["access_method"]) not in AUTOMATED_METHODS:
@@ -124,8 +134,15 @@ def evaluate_source(row, now: datetime | None = None) -> SourceHealth:
                      f"last check failed: {last_error}")
 
     if last_success is None:
-        baseline = created or moment
-        age_minutes = (moment - baseline).total_seconds() / 60
+        if created is None:
+            # A missing/invalid registration time must not disable the
+            # never-successful alarm by making the source look brand new.
+            return _make(
+                "stale", False, True,
+                f"never succeeded and registration time is invalid "
+                f"({_text(row['created_at']) or 'missing'}; "
+                f"threshold {stale_after}m)")
+        age_minutes = (moment - created).total_seconds() / 60
         if age_minutes >= stale_after:
             return _make(
                 "stale", False, True,

@@ -83,6 +83,14 @@ def test_review_flow_end_to_end(tmp_path, monkeypatch, capsys):
     assert not store.get_report(conn, rid)["published_at"]
     conn.close()
 
+    # Heuristic rewording works with no model; --ai without config fails.
+    assert main(["--data-dir", config.data_dir, "reports", "summarise",
+                 str(rid)]) == 0
+    assert main(["--data-dir", config.data_dir, "reports", "summarise",
+                 str(rid), "--ai"]) == 1
+    err = capsys.readouterr()
+    assert "disabled" in (err.out + err.err).lower()
+
     # Approval with notes publishes and leaves an audit trail.
     assert main(["--data-dir", config.data_dir, "review", str(rid),
                  "--approve", "--reviewer", "Test Reviewer",
@@ -94,13 +102,11 @@ def test_review_flow_end_to_end(tmp_path, monkeypatch, capsys):
     assert row["verification_status"] == "approved" and row["published_at"]
     conn.close()
 
-    # Heuristic rewording works with no model; --ai without config fails.
+    # Published text is immutable without a new draft and re-approval.
     assert main(["--data-dir", config.data_dir, "reports", "summarise",
-                 str(rid)]) == 0
-    assert main(["--data-dir", config.data_dir, "reports", "summarise",
-                 str(rid), "--ai"]) == 1
+                 str(rid)]) == 1
     err = capsys.readouterr()
-    assert "disabled" in (err.out + err.err).lower()
+    assert "published report" in (err.out + err.err).lower()
 
     # Queue shows the resolved decision, not pending work.
     assert main(["--data-dir", config.data_dir, "review", "--list"]) == 0

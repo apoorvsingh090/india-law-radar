@@ -37,3 +37,9 @@ history.
 version: title + extracted body) mirrored into FTS5 `search_fts` by
 triggers. The pipeline indexes each new version; `ensure_indexed`
 backfills pre-M5 databases on first search.
+
+**Milestone 6-10 updates:** `004` adds `feedback`; `005` adds
+`sources.retired_at` so entries removed from the registry stop alerting
+without deleting history. Backups are whole-file SQLite snapshots
+with sidecars/manifests (`db/backup.py`), not a new table; `_migrations`
+is read to prove a restored file belongs to this schema.

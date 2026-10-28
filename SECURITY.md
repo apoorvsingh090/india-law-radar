@@ -35,10 +35,16 @@ Out of scope:
 ## Design notes
 
 - Web UI refuses to bind beyond loopback without an explicit `--token`.
+- Every POST requires a loopback `Host` (when bound to loopback) and
+  same-origin `Origin`/`Referer`/`Sec-Fetch-Site`; this blocks CSRF and
+  DNS rebinding. `/feedback` is public but rate-limited and same-origin.
 - Review policy is `manual`: unverified reports are never published.
 - No telemetry and no paid services; data lives in a local directory
   (`LAWRADAR_DATA_DIR`).
+- Backup checksums are unkeyed: they detect corruption and partial copies,
+  not an attacker who can rewrite the DB and sidecars. Protect the backup
+  directory with filesystem permissions and keep off-host copies.
 
 ## Supported versions
 
-Only the latest code on `main` (currently `0.9.0`) is supported.
+Only the latest code on `main` (currently `0.10.0`) is supported.

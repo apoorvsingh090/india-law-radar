@@ -41,7 +41,8 @@ CLI (argparse) → config.py → logging_config.py → local data dir + sqlite
   eval`) → `docs/coverage.md` (per-source live findings) +
   `docs/runbook.md` (failure table, reprocessing recipes).
 - M7 adds: per-IP POST rate limiting + security headers + `--token`
-  gating in `web/server.py`, feedback` table (migration `004`) with
+  gating and same-origin/Host POST checks (CSRF, DNS rebinding) in
+  `web/server.py`, `feedback` table (migration `004`) with
   `/feedback` intake auto-opening review tasks and `feedback` CLI
   triage, `/privacy` + `/limitations` pages, `docs/deployment.md` +
   `docs/feedback.md`.
@@ -61,3 +62,14 @@ CLI (argparse) → config.py → logging_config.py → local data dir + sqlite
   (exit 1 when unhealthy), the dashboard, `/sources`, and
   `/api/sources/health` share this function; no network calls and no
   new dependencies.
+- M10 adds: `db/backup.py` - `backup create` uses SQLite's online backup
+  API for a consistent copy, then writes a SHA-256 sidecar and JSON
+  manifest (format, source, counts, migration names). `backup verify`
+  opens read-only, checks the sidecar, `integrity_check`,
+  `foreign_key_check`, required tables, and manifest counts before
+  trusting a file. `backup restore` verifies, snapshots the current DB
+  as `lawradar-pre-restore-*`, copies to a partial file, and
+  `os.replace`s it into place (removing stale WAL/SHM). `serve`/`watch`
+  hold a shared runtime lock and restore requires it exclusively, so a
+  live process cannot be swapped out from under itself. No new
+  dependency is involved.

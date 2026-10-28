@@ -57,6 +57,19 @@ def test_report_text_is_escaped():
         "amp & <quotes> \" '"
 
 
+def test_invalid_xml_control_characters_are_dropped():
+    feed = atom_feed([
+        _report(5, "Act\x0cTitle", "2026-10-22T09:00:00.000Z",
+                summary="summary\x07with controls"),
+    ])
+    root = ET.fromstring(feed)
+    entry = root.find("{http://www.w3.org/2005/Atom}entry")
+    assert entry.findtext("{http://www.w3.org/2005/Atom}title") == \
+        "ActTitle — text_modified"
+    assert entry.findtext("{http://www.w3.org/2005/Atom}summary") == \
+        "summarywith controls"
+
+
 def test_feed_is_deterministic():
     rows = [_report(4, "Act", "2026-10-21T09:00:00.000Z")]
     assert atom_feed(rows) == atom_feed(list(rows))

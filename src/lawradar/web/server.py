@@ -1,4 +1,4 @@
-"""Stdlib web server (Milestone 9): no new dependencies.
+"""Stdlib web server (Milestone 10): no new dependencies.
 
 Serves the dashboard, change feed, report detail, search, source
 registry, review queue, coverage/privacy/limitations pages, feedback
@@ -21,6 +21,7 @@ from lawradar.search import fts as search_fts
 from lawradar.web import feeds, pages
 
 MAX_POST_BYTES = 1_000_000
+LOOPBACK_HOSTS = frozenset({"127.0.0.1", "localhost", "::1"})
 
 SECURITY_HEADERS = {
     "X-Content-Type-Options": "nosniff",
@@ -49,7 +50,7 @@ class RateLimiter:
 
 
 class Handler(BaseHTTPRequestHandler):
-    server_version = "IndiaLawRadar/0.9.0"
+    server_version = "IndiaLawRadar/0.10.0"
 
     # -- helpers ---------------------------------------------------------
     def _db(self):
@@ -115,10 +116,9 @@ class Handler(BaseHTTPRequestHandler):
                 elif path == "/feedback":
                     self._page("Report an error",
                                pages.feedback_page(
-                                   report_id=query.get("report", [""])[0],
-                                   token=self._token_value(query)))
+                                   report_id=query.get("report", [""])[0]))
                 elif path == "/health":
-                    self._json({"status": "ok", "version": "0.9.0"})
+                    self._json({"status": "ok", "version": "0.10.0"})
                 elif path == "/feed.xml":
                     # Published-only Atom feed (M8): the review gate, not
                     # ingestion, decides what appears here.
@@ -296,12 +296,61 @@ class Handler(BaseHTTPRequestHandler):
         return limiter.allow(self._client_ip())
 
     def _read_form(self):
-        length = int(self.headers.get("Content-Length") or 0)
+        raw_length = self.headers.get("Content-Length")
+        try:
+            length = int(raw_length) if raw_length else 0
+        except (TypeError, ValueError):
+            self._page("Error", "<p>Invalid Content-Length.</p>", 400)
+            return None
+        if length < 0:
+            self._page("Error", "<p>Invalid Content-Length.</p>", 400)
+            return None
         if length > MAX_POST_BYTES:
             self._page("Error", "<p>Form too large.</p>", 413)
             return None
         body = self.rfile.read(length).decode("utf-8", "replace")
         return urllib.parse.parse_qs(body)
+
+    @staticmethod
+    def _host_name(host: str) -> str:
+        value = (host or "").strip().lower().rstrip(".")
+        if value.startswith("["):
+            end = value.find("]")
+            return value[1:end] if end != -1 else value
+        if value.count(":") == 1:
+            return value.rsplit(":", 1)[0]
+        return value
+
+    def _check_request_origin(self) -> bool:
+        """Reject cross-site form POSTs and DNS-rebinding hosts."""
+        host = (self.headers.get("Host") or "").strip()
+        host_name = self._host_name(host)
+        bind_host = str(getattr(self.server, "server_address", ("", 0))[0])
+        if not host_name:
+            self._page("Forbidden", "<p>Missing Host header.</p>", 403)
+            return False
+        if bind_host in LOOPBACK_HOSTS and host_name not in LOOPBACK_HOSTS:
+            self._page(
+                "Forbidden",
+                "<p>This server only accepts loopback Host headers.</p>", 403)
+            return False
+        if (self.headers.get("Sec-Fetch-Site") or "").strip().lower() == \
+                "cross-site":
+            self._page("Forbidden", "<p>Cross-site POST rejected.</p>", 403)
+            return False
+        origin = self.headers.get("Origin")
+        referer = self.headers.get("Referer")
+        source = origin or referer
+        if source:
+            parsed = urllib.parse.urlparse(source)
+            if (parsed.scheme not in ("http", "https")
+                    or parsed.netloc.lower() != host.lower()
+                    or (parsed.hostname or "").lower().rstrip(".")
+                    != host_name):
+                self._page("Forbidden",
+                           "<p>Cross-origin POST rejected.</p>", 403)
+                return False
+        return True
 
     def _check_token(self, form: dict) -> bool:
         token = getattr(self.server, "token", "")
@@ -314,6 +363,8 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:  # noqa: N802
         try:
+            if not self._check_request_origin():
+                return
             parsed = urllib.parse.urlparse(self.path)
             review_match = re.fullmatch(r"/reports/(\d+)/review", parsed.path)
             if parsed.path == "/feedback":
@@ -377,8 +428,6 @@ class Handler(BaseHTTPRequestHandler):
         form = self._read_form()
         if form is None:
             return
-        if not self._check_token(form):
-            return
         raw_report = form.get("report_id", [""])[0].strip()
         try:
             report_id = int(raw_report) if raw_report else None
@@ -403,8 +452,7 @@ class Handler(BaseHTTPRequestHandler):
                 ensure_task(
                     conn, report_id=report_id,
                     document_version_id=report["new_version_id"],
-                    reason=f"user-reported error (feedback #{feedback_id}): "
-                           f"{message[:200]}",
+                    reason=f"user-reported error (feedback #{feedback_id})",
                     severity="medium")
             conn.commit()
         except ValueError as exc:
@@ -434,11 +482,14 @@ def serve_forever(db_path: str = "data/lawradar.db", host: str = "127.0.0.1",
                   port: int = 8080, token: str = "",
                   post_limit_per_minute: int = 30) -> None:
     """Block serving until interrupted."""
+    from lawradar.db.lock import runtime_lock
+
     server = build_server(db_path, host, port, token, post_limit_per_minute)
     address = f"http://{server.server_address[0]}:{server.server_address[1]}"
     print(f"Serving {pages.APP_TITLE} at {address} (Ctrl-C to stop)")
     try:
-        server.serve_forever()
+        with runtime_lock(db_path):
+            server.serve_forever()
     except KeyboardInterrupt:
         pass
     finally:

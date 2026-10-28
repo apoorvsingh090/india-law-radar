@@ -301,14 +301,12 @@ def not_found(path: str) -> str:
     return f"<p>No page for {esc(path)}. <a href=\"/\">Back to dashboard</a>.</p>"
 
 
-def feedback_page(report_id: str = "", token: str = "") -> str:
-    token_field = (f"<input type=\"hidden\" name=\"token\" value=\"{esc(token)}\">"
-                   if token else "")
+def feedback_page(report_id: str = "") -> str:
     return (
-        "<p>Found a wrong title, date, citation, or link? Tell us — error "
+        "<p>Found a wrong title, date, citation, or link? Tell us - error "
         "reports linked to a report automatically join the human review "
         "queue.</p>"
-        f"<form method=\"post\" action=\"/feedback\">{token_field}"
+        "<form method=\"post\" action=\"/feedback\">"
         f"<label>Report id (optional) <input name=\"report_id\" "
         f"value=\"{esc(report_id)}\"></label><br>"
         "<label>Contact (optional) <input name=\"contact\"></label><br>"

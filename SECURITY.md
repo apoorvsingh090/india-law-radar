@@ -22,6 +22,8 @@ In scope:
 - Secrets committed to the repo (`.env`, API keys, cookies) — `.gitignore`
   blocks `.env`, `*_api_key*`, `cookies.txt`; report accidental commits so they
   can be purged
+- Webhook signing regressions from Milestone 11 (X-LawRadar-Token) that
+  would let a receiver accept an unsigned or forged payload
 - Citation-integrity bugs where fabricated or unverifiable references could be
   published as verified findings (this is a correctness-security issue for a
   legal-monitoring tool)
@@ -47,4 +49,4 @@ Out of scope:
 
 ## Supported versions
 
-Only the latest code on `main` (currently `0.10.0`) is supported.
+Only the latest code on `main` (currently `0.11.0`) is supported.

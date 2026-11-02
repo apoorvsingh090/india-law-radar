@@ -5,6 +5,32 @@ All notable changes to India Law Radar will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.0] - 2026-11-03
+
+### Added
+
+- Milestone 11 (outbound notifications): after a human approval commits,
+  the approved report is POSTed as deterministic JSON to every configured
+  webhook target (`notify_webhooks` in settings, off by default) with
+  optional HMAC-SHA256 signing (`X-LawRadar-Token: t=<ts>,v1=<hex>` over
+  `<ts>.<body>`)
+- Delivery is at most once per (report, webhook): a partial unique index
+  (migration `006`, `notification_attempts` table) fail-closes duplicate
+  sends; repeats report `deduplicated`
+- Delivery problems can never block or roll back a publication: per-target
+  HTTP/DNS/timeout errors are recorded as `failed` attempts (status,
+  capped response snippet) and surfaced on the report page, the dashboard,
+  and `/api/notifications`
+- `lawradar notify list` (audit/triage with target summary) and
+  `lawradar notify send` (explicit, idempotent retry path; exit 1 when
+  any target still fails; a disabled setup returns exit 2)
+- Config: `notify_enabled`, `notify_webhooks` (name/url/secret/enabled),
+  `notify_timeout_seconds` + `LAWRADAR_NOTIFY_ENABLED`/
+  `LAWRADAR_NOTIFY_TIMEOUT_SECONDS` env overrides; only `http`/`https`
+  targets accepted and names must be unique
+- `notify/dispatch.py` (stdlib only) with unit + real-CLI integration
+  tests against an in-process HTTP receiver
+
 ## [0.10.0] - 2026-10-28
 
 ### Added

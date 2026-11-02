@@ -5,14 +5,15 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
 Source-verifiable monitoring of official Indian legal documents.
-**Milestone 10 (this release):** verifiable backups - `lawradar backup
-create` writes a SQLite snapshot plus SHA-256 sidecar and JSON manifest;
-`backup verify` fails closed on tampering or a missing sidecar; `backup
-restore` verifies first, snapshots the current DB, and swaps atomically
-with `--force`. Builds on M9 source health (`lawradar sources health`,
-stale/failing sweeps exit 1), the M8 radar loop (`lawradar watch`, Atom
-feed of **approved** reports), and `docs/pilot.md`. Still zero paid
-dependencies.
+**Milestone 11 (this release):** outbound notifications - once a human
+approval commits, the approved report is POSTed as a signed JSON payload
+to explicitly configured webhook targets (stdlib `urllib`, no new
+dependencies). Delivery is **at most once per (report, webhook)**,
+failures never block or roll back the approval, and `lawradar notify
+list` / `notify send` audit and retry. Builds on M10 verifiable backups,
+M9 source health (`lawradar sources health`, stale/failing sweeps exit 1),
+the M8 radar loop (`lawradar watch`, Atom feed of **approved** reports),
+and `docs/pilot.md`. Still zero paid dependencies.
 
 > Scope honesty: this MVP does **not** claim complete coverage of Indian law,
 > is not a substitute for a qualified advocate, and every future change report
@@ -43,14 +44,15 @@ pytest
 lawradar serve
 # open http://127.0.0.1:8080 — dashboard, changes, report detail,
 # search, sources with health badges, review queue, coverage, Atom feed
-# (/feed.xml, approved reports only). Use --token for review POSTs if binding
-# beyond loopback (serve refuses otherwise).
+# (/feed.xml, approved reports only), and per-report webhook delivery
+# status. Use --token for review POSTs if binding beyond loopback
+# (serve refuses otherwise).
 ```
 
 Expected: `lawradar health` prints `health: OK` with three PASS lines;
 `pytest` passes (unit + integration).
 
-## CLI (Milestone 10)
+## CLI (Milestone 11)
 
 ```text
 lawradar init [--force]        dirs + config + migrate sqlite schema
@@ -74,6 +76,8 @@ lawradar reports verify <id>  deterministic citation check (exit 1 on fail)
 lawradar reports summarise <id> [--ai]  reword summary (validated, no model by default)
 lawradar review --list        pending human-review queue
 lawradar review <id> --approve|--reject|--changes --reviewer R --notes "…"
+lawradar notify list [--report ID] [--status S]   webhook attempts (audit/triage)
+lawradar notify send [--report ID] [--limit N]    deliver pending targets (exit 1 on failure)
 lawradar serve [--host 127.0.0.1] [--port 8080] [--token ...]
 lawradar eval                  curated pilot evaluation set (expect 7/7)
 lawradar feedback list         triage user error reports
@@ -87,6 +91,15 @@ Review policy is `manual`: reports are **unpublished** until a human
 approves them; rejections and change-requests require notes. AI output
 can never bypass schema validation — malformed JSON or invented
 citations are rejected and recorded as failed attempts.
+
+Notifications (optional, off by default): set `notify_enabled: true` and
+add `notify_webhooks` targets in `config/settings.yaml` (never
+committed). After `review --approve` commits, each enabled target gets
+one POST with the approved report's JSON and, when a target has a
+`secret`, an `X-LawRadar-Token: t=<ts>,v1=<hmac>` header the receiver can
+verify. HTTP 4xx/5xx, DNS, and timeout failures are recorded as
+`failed` attempts (visible on the report page and via `notify list`);
+publication is never rolled back and nothing is auto-retried.
 
 Try without network: `lawradar ingest fixture-sample --sources-file
 config/sources.example.yaml` twice — the second run reports `changed=0`
@@ -106,9 +119,10 @@ docs/          architecture, data-model, source-policy, evaluation, limitations,
                pilot runbook (real-source operation, M8-10), backup/restore (M10)
 src/lawradar/  cli, config, logging, db/store + db/backup, sources/*,
                ingestion/* (watch, health), extraction/*, diffing/*,
-               reporting/*, review/*, ai/*, search/fts, web/* (incl. Atom
-               feed), evaluation/*
-migrations/    001-005 (schema, ai_attempts, FTS index, feedback, retirement)
+               reporting/*, review/*, ai/*, notify/dispatch (webhooks),
+               search/fts, web/* (incl. Atom feed), evaluation/*
+migrations/    001-006 (schema, ai_attempts, FTS index, feedback, retirement,
+               notifications)
 tests/         unit + integration + fixtures + evaluation notes
 scripts/       operator helpers (probe script; daily pilot loop is CLI-only)
 data/          local-only runtime data (git-ignored except README/.gitkeep)
@@ -125,7 +139,8 @@ data/          local-only runtime data (git-ignored except README/.gitkeep)
 - M7: beta hardening, feedback loop, deployment docs (done)
 - M8: watch sweeps, Atom feed of approved reports, pilot runbook (done)
 - M9: source health/staleness, dashboard + API signals, scheduler exit code (done)
-- M10: verifiable SQLite backups, restore with safety snapshot (done here)
+- M10: verifiable SQLite backups, restore with safety snapshot (done)
+- M11: outbound webhook notifications of approved reports (done here)
 
 ## Safeguards
 

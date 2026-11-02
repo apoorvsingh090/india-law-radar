@@ -43,3 +43,10 @@ backfills pre-M5 databases on first search.
 without deleting history. Backups are whole-file SQLite snapshots
 with sidecars/manifests (`db/backup.py`), not a new table; `_migrations`
 is read to prove a restored file belongs to this schema.
+
+**Milestone 11 update:** `006` adds `notification_attempts` - one row
+per outbound webhook attempt (`webhook` target name, `status` =
+`delivered`/`failed`, HTTP status, capped response snippet). A partial
+unique index on `(change_report_id, webhook) WHERE status='delivered'`
+enforces at-most-once delivery; reports stay referenced with
+`ON DELETE SET NULL` so the audit trail survives report deletion.

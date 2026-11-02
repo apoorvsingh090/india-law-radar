@@ -30,6 +30,9 @@ DEFAULTS: dict = {
     "ai_enabled": False,
     "ai_command": "",
     "post_limit_per_minute": 30,
+    "notify_enabled": False,
+    "notify_webhooks": [],
+    "notify_timeout_seconds": 10,
 }
 
 ENV_MAP = {
@@ -42,6 +45,8 @@ ENV_MAP = {
     "LAWRADAR_AI_ENABLED": "ai_enabled",
     "LAWRADAR_AI_COMMAND": "ai_command",
     "LAWRADAR_POST_LIMIT_PER_MINUTE": "post_limit_per_minute",
+    "LAWRADAR_NOTIFY_ENABLED": "notify_enabled",
+    "LAWRADAR_NOTIFY_TIMEOUT_SECONDS": "notify_timeout_seconds",
     "LAWRADAR_CONFIG": None,  # path to config file itself, handled separately
 }
 
@@ -60,6 +65,9 @@ class AppConfig:
     ai_enabled: bool = False
     ai_command: str = ""
     post_limit_per_minute: int = 30
+    notify_enabled: bool = False
+    notify_webhooks: list = field(default_factory=list)
+    notify_timeout_seconds: int = 10
     config_path: str = ""
     extra: dict = field(default_factory=dict)
 
@@ -77,6 +85,9 @@ class AppConfig:
             "ai_enabled": self.ai_enabled,
             "ai_command": self.ai_command,
             "post_limit_per_minute": self.post_limit_per_minute,
+            "notify_enabled": self.notify_enabled,
+            "notify_webhook_count": len(self.notify_webhooks),
+            "notify_timeout_seconds": self.notify_timeout_seconds,
         }
 
 
@@ -127,7 +138,8 @@ def load_settings(explicit: str | None = None) -> AppConfig:
             merged[key] = raw
     # Coerce numeric fields that may arrive as strings from env vars.
     for int_key in ("poll_default_minutes", "http_timeout_seconds",
-                      "http_max_bytes", "post_limit_per_minute"):
+                      "http_max_bytes", "post_limit_per_minute",
+                      "notify_timeout_seconds"):
         try:
             merged[int_key] = int(merged[int_key])
         except (TypeError, ValueError) as exc:
@@ -135,6 +147,10 @@ def load_settings(explicit: str | None = None) -> AppConfig:
     if isinstance(merged["ai_enabled"], str):
         merged["ai_enabled"] = (
             merged["ai_enabled"].strip().lower() in ("1", "true", "yes", "on"))
+    if isinstance(merged["notify_enabled"], str):
+        merged["notify_enabled"] = (
+            merged["notify_enabled"].strip().lower() in ("1", "true", "yes", "on"))
+    merged["notify_webhooks"] = _normalise_webhooks(merged["notify_webhooks"])
     if merged["review_policy"] not in ("manual",):
         raise ValueError(
             f"Unknown review_policy: {merged['review_policy']!r} "
@@ -146,6 +162,35 @@ def load_settings(explicit: str | None = None) -> AppConfig:
         config_path=str(config_path) if config_path else "",
         extra=extra,
     )
+
+
+def _normalise_webhooks(raw) -> list[dict]:
+    """Structural validation of notify_webhooks (Milestone 11).
+
+    Operative checks (scheme, uniqueness) live in notify.dispatch; here we
+    only guarantee an operator-safe structure so malformed YAML fails at
+    load time instead of mid-dispatch.
+    """
+    if raw in (None, ""):
+        return []
+    if not isinstance(raw, list):
+        raise ValueError("notify_webhooks must be a list of mappings")
+    entries: list[dict] = []
+    for index, item in enumerate(raw):
+        if not isinstance(item, dict):
+            raise ValueError(
+                f"notify_webhooks[{index}] must be a mapping with at "
+                "least 'url'")
+        url = str(item.get("url", "")).strip()
+        if not url:
+            raise ValueError(f"notify_webhooks[{index}] is missing 'url'")
+        entries.append({
+            "name": str(item.get("name", "")),
+            "url": url,
+            "secret": str(item.get("secret", "")),
+            "enabled": item.get("enabled", True),
+        })
+    return entries
 
 
 def ensure_data_dir(config: AppConfig) -> Path:

@@ -1,4 +1,4 @@
-# Limitations (public disclosure — Milestone 10)
+# Limitations (public disclosure — Milestone 11)
 
 - Coverage: only the sources shown on `/sources` that are actually ingested.
   The pilot set is small (see `docs/coverage.md`); no completeness claim is made.
@@ -15,6 +15,15 @@
   cannot bypass human review.
 - Dates/status: unknown until evidenced; presence in the database ≠ in force.
   Publication, commencement, and applicability are distinct and never inferred.
+- Notifications: disabled by default. When `notify_webhooks` targets are
+  configured, approved report content (summary, sections, official URL)
+  leaves the operator's host as signed JSON to chosen endpoints —
+  configure only receivers trusted to hold that content. Signing
+  secrets sit unencrypted in the local settings YAML (git-ignored);
+  webhook URLs may be operator-chosen hosts, so only list endpoints the
+  operator controls. Failures mean "this attempt failed", not
+  "nobody was notified"; `notify send` is the only retry path and
+  delivery is attempted at most once per (report, target).
 - Backups: `lawradar backup create` snapshots the SQLite DB, not raw/text
   corpora, config, or secrets. Snapshots are unencrypted and only as good
   as their off-host copy; a `.db` without its checksum/manifest sidecars is

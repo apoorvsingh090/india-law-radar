@@ -569,6 +569,70 @@ def set_ai_attempts(
     )
 
 
+# -- outbound notifications (M11) --------------------------------------------
+
+def record_notification_attempt(
+    conn: sqlite3.Connection,
+    *,
+    change_report_id: int,
+    webhook: str,
+    url: str,
+    status: str,
+    http_status: int | None = None,
+    response_snippet: str = "",
+    error: str = "",
+) -> int:
+    cursor = conn.execute(
+        """INSERT INTO notification_attempts
+           (change_report_id, webhook, url, status, http_status,
+            response_snippet, error)
+           VALUES (?, ?, ?, ?, ?, ?, ?)""",
+        (change_report_id, webhook, url, status, http_status,
+         response_snippet[:2000], error[:2000]),
+    )
+    return int(cursor.lastrowid)
+
+
+def delivered_webhooks(conn: sqlite3.Connection,
+                       change_report_id: int) -> set[str]:
+    rows = conn.execute(
+        "SELECT webhook FROM notification_attempts "
+        "WHERE change_report_id=? AND status='delivered'",
+        (change_report_id,))
+    return {row["webhook"] for row in rows}
+
+
+def list_notification_attempts(
+    conn: sqlite3.Connection,
+    change_report_id: int | None = None,
+    status: str | None = None,
+    limit: int = 100,
+) -> list[sqlite3.Row]:
+    clauses, params = [], []
+    if change_report_id is not None:
+        clauses.append("change_report_id=?")
+        params.append(change_report_id)
+    if status:
+        clauses.append("status=?")
+        params.append(status)
+    where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+    params.append(limit)
+    return list(conn.execute(
+        f"SELECT * FROM notification_attempts {where} "
+        "ORDER BY id DESC LIMIT ?", params))
+
+
+def count_failed_attempts(conn: sqlite3.Connection, limit: int = 100) -> int:
+    """Failed attempts among the most recent ``limit`` attempts."""
+    row = conn.execute(
+        """SELECT COUNT(*) AS c FROM (
+             SELECT status FROM notification_attempts ORDER BY id DESC LIMIT ?
+           ) WHERE status='failed'""",
+        (limit,),
+    ).fetchone()
+    return int(row["c"])
+
+
 # -- user feedback (M7) ------------------------------------------------------
 
 def add_feedback(

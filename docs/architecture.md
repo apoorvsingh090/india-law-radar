@@ -73,3 +73,14 @@ CLI (argparse) → config.py → logging_config.py → local data dir + sqlite
   hold a shared runtime lock and restore requires it exclusively, so a
   live process cannot be swapped out from under itself. No new
   dependency is involved.
+- M11 adds: `notify/dispatch.py` - outbound webhook fan-out that runs
+  only after a human approval has committed (`after_approval` at the two
+  review entry points, never inside `review.queue.resolve`). Each target
+  gets one POST (stdlib `urllib`, configurable timeout, `http`/`https`
+  only) with deterministic JSON and optional `X-LawRadar-Token`
+  HMAC-SHA256 signing. Outcomes land in `notification_attempts`
+  (migration `006`); a partial unique index enforces at-most-once per
+  (report, webhook). Failures are recorded, never raised past the
+  review flow, and retried only through explicit `lawradar notify send`.
+  The web server carries the config so web review POSTs fan out the
+  same way; `/api/notifications` exposes recent attempts.

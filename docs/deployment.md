@@ -1,4 +1,4 @@
-# Deployment (public beta, M10)
+# Deployment (public beta, M11)
 
 The app stays usable locally with no paid service. Anything beyond
 loopback needs the guards below — there is no multi-user auth model.
@@ -43,6 +43,9 @@ Any Python host works (buildpack-style: `pip install .`, then
   if hosting lapses.
 - Put TLS + real authentication (reverse proxy) in front. The
   `--token` is a shared secret, not user accounts.
+- Webhook notifications need outbound egress to each `notify_webhooks`
+  host; a locked-down host will log `failed` attempts behind a proxy
+  wall.
 
 ## Backups (M10)
 
@@ -71,8 +74,22 @@ will fail verification by design. Details and a restore drill:
 | `LAWRADAR_LOG_LEVEL` / `_LOG_FILE` | logging | `INFO` / stdout |
 | `LAWRADAR_REVIEW_POLICY` | only `manual` | `manual` |
 | `LAWRADAR_AI_ENABLED` / `_AI_COMMAND` | optional summariser | `false` / empty |
+| `LAWRADAR_NOTIFY_ENABLED` | webhook fan-out of approvals | `false` |
+| `LAWRADAR_NOTIFY_TIMEOUT_SECONDS` | per-webhook POST timeout | `10` |
 | `LAWRADAR_POST_LIMIT_PER_MINUTE` | POST rate limit | `30` |
 | `LAWRADAR_CONFIG` | alternate settings file | `config/settings.yaml` |
 
 No secrets are required for local use. Never commit `.env`,
 `config/settings.yaml`, `config/sources.yaml`, or `data/`.
+
+## Notifications (M11)
+
+Webhook fan-out is configured only in settings YAML
+(`notify_enabled`, `notify_webhooks`, `notify_timeout_seconds`) — there
+are no env vars for target URLs or secrets, so they never leak into
+process listings. Secrets sit unencrypted in the git-ignored settings
+file: protect it like the DB. Targets must be `http`/`https` URLs with
+unique names; delivery is at most once per (report, target), failures
+are recorded (`lawradar notify list`) and retried only on explicit
+`lawradar notify send`. If you keep secrets in `.env` style tooling,
+consider this list empty by default — the app needs no keys.

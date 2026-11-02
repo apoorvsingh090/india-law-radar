@@ -1,4 +1,4 @@
-# Real-source pilot runbook (Milestone 8-10)
+# Real-source pilot runbook (Milestone 8-11)
 
 This is the operator procedure for running India Law Radar against real
 official sources. It exists because automation alone is not enough: the
@@ -17,7 +17,10 @@ script approve a report — humans close every loop.
   the proven path for `manual_import` sources (India Code PDFs,
   Legislative Department uploads). Watch sweeps never touch these.
 - `lawradar review <id> --approve --reviewer NAME --notes "…"` — the
-  only way a report becomes visible in `/feed.xml`.
+  only way a report becomes visible in `/feed.xml`. Approval also fans
+  out at-most-once signed webhook posts to `notify_webhooks` targets
+  (off by default; failures never block approval and are retriable via
+  `lawradar notify send`).
 - `lawradar sources health` — separates a scheduled sweep that works
   from one that silently stopped: `stale` means no success within
   `2 x poll_interval` (min 15m), `failing` means the last check errored.
@@ -44,6 +47,8 @@ lawradar review --list
 lawradar reports show <id>          # compare claims against the official page
 lawradar reports verify <id>        # machine citation check first
 lawradar review <id> --approve --reviewer "Your Name" --notes "compared <date>"
+#    (approving fires the configured webhooks once; check failures with
+#     lawradar notify list and retry with lawradar notify send)
 
 # 4. Readers subscribe to approved reports only
 lawradar serve                      # http://127.0.0.1:8080/feed.xml

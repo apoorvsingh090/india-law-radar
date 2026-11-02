@@ -1,4 +1,4 @@
-"""Command-line interface for India Law Radar (Milestone 10).
+"""Command-line interface for India Law Radar (Milestone 11).
 
 Implemented commands (all functional, no placeholders):
   lawradar init              — create data dir, local settings.yaml, migrate db
@@ -17,6 +17,8 @@ Implemented commands (all functional, no placeholders):
   lawradar reports summarise <id> [--ai] — reword summary (validated)
   lawradar review --list     — pending human-review queue
   lawradar review <id> --approve|--reject|--changes --notes "..."
+  lawradar notify list       — webhook delivery attempts (audit/triage)
+  lawradar notify send       — deliver published reports to pending targets
   lawradar serve [--host 127.0.0.1] [--port 8080] [--token ...]
   lawradar eval                run the curated pilot evaluation set
   lawradar feedback list       triage user error reports
@@ -157,6 +159,22 @@ def build_parser() -> argparse.ArgumentParser:
                           help="Review notes (required to reject/request changes)")
     p_review.add_argument("--limit", type=int, default=50)
 
+    p_notify = sub.add_parser(
+        "notify", help="Outbound webhook deliveries (approved reports)")
+    notify_sub = p_notify.add_subparsers(dest="notify_command", required=True)
+    p_nlist = notify_sub.add_parser(
+        "list", help="Recent delivery attempts (audit + triage)")
+    p_nlist.add_argument("--report", type=int, default=None,
+                         help="Only attempts for this report id")
+    p_nlist.add_argument("--status", default=None,
+                         help="Filter by delivered/failed")
+    p_nlist.add_argument("--limit", type=int, default=50)
+    p_nsend = notify_sub.add_parser(
+        "send", help="Deliver published reports to pending webhook targets")
+    p_nsend.add_argument("--report", type=int, default=None,
+                         help="Deliver only this report id")
+    p_nsend.add_argument("--limit", type=int, default=50)
+
     p_serve = sub.add_parser("serve", help="Run the local web interface")
     p_serve.add_argument("--host", default="127.0.0.1",
                          help="Bind address (keep 127.0.0.1 unless proxied)")
@@ -262,7 +280,7 @@ def cmd_init(args: argparse.Namespace) -> int:
     return 0
 
 
-APP_LABEL = "India Law Radar v0.10.0 (Milestone 10)"
+APP_LABEL = f"India Law Radar v{__version__} (Milestone 11)"
 
 
 def _sqlite_path(db_url: str, data_dir: Path) -> Path | None:
@@ -721,6 +739,13 @@ def cmd_review(args: argparse.Namespace) -> int:
         except Exception as exc:  # noqa: BLE001 — ReviewError/ValueError
             print(f"review rejected: {exc}", file=sys.stderr)
             return 1
+        if outcome["decision"] == "approved":
+            # Fire-and-forget: committed publication is never rolled back,
+            # and delivery failures are recorded, not raised.
+            from lawradar.notify.dispatch import after_approval
+
+            outcome["notifications"] = after_approval(
+                config, conn, args.report_id)
         trail = audit_trail(conn, args.report_id)
         if args.json:
             print(json.dumps({**outcome, "audit_trail": trail}, indent=2,
@@ -730,6 +755,15 @@ def cmd_review(args: argparse.Namespace) -> int:
                   f"by {outcome['reviewer']} "
                   f"(tasks resolved: {outcome['tasks_resolved']})")
             print(f"  audit trail entries: {len(trail)}")
+            notifications = outcome.get("notifications") or []
+            if notifications:
+                counts: dict[str, int] = {}
+                for item in notifications:
+                    counts[item.get("status", "?")] = \
+                        counts.get(item.get("status", "?"), 0) + 1
+                summary = ", ".join(f"{v} {k}" for k, v in sorted(counts.items()))
+                print(f"  notifications: {summary}"
+                      f" (`lawradar notify send` retries failed targets)")
         return 0
     finally:
         conn.close()
@@ -752,7 +786,8 @@ def cmd_serve(args: argparse.Namespace) -> int:
     try:
         serve_forever(str(_db_path(config)), host=args.host, port=args.port,
                       token=args.token,
-                      post_limit_per_minute=config.post_limit_per_minute)
+                      post_limit_per_minute=config.post_limit_per_minute,
+                      config=config)
     except LockBusy as exc:
         print(str(exc), file=sys.stderr)
         return 2
@@ -813,6 +848,89 @@ def cmd_feedback(args: argparse.Namespace) -> int:
     finally:
         conn.close()
     return 0
+
+
+def cmd_notify(args: argparse.Namespace) -> int:
+    from lawradar.db import store
+    from lawradar.ingestion.pipeline import _db_path
+    from lawradar.notify.dispatch import (
+        NotifyError,
+        dispatch_pending,
+        targets_from_config,
+    )
+
+    config = _effective_config(args)
+    setup_logging(config.log_level, config.log_file)
+    store.init_db(_db_path(config))
+    conn = store.connect(_db_path(config))
+    try:
+        if args.notify_command == "list":
+            rows = store.list_notification_attempts(
+                conn, change_report_id=args.report,
+                status=args.status, limit=args.limit)
+            if args.json:
+                print(json.dumps([dict(r) for r in rows], indent=2,
+                                 default=str))
+            else:
+                if getattr(config, "notify_enabled", False):
+                    print("notify: enabled")
+                else:
+                    print("notify: disabled (notifications are off)")
+                try:
+                    targets = targets_from_config(config)
+                except NotifyError as exc:
+                    targets = []
+                    print(f"  target config error: {exc}")
+                if targets:
+                    for t in targets:
+                        print(f"  target: {t.name} -> {t.url} "
+                              f"({'on' if t.enabled else 'off'}"
+                              f"{', signed' if t.secret else ''})")
+                elif not getattr(config, "notify_enabled", False):
+                    print("  (no targets configured; see "
+                          "config/settings.example.yaml)")
+                else:
+                    print("  (no targets configured)")
+                if not rows:
+                    print("No delivery attempts yet.")
+                for r in rows:
+                    http = (f" http={r['http_status']}"
+                            if r["http_status"] is not None else "")
+                    error = (f" error={r['error'][:120]}"
+                             if r["error"] else "")
+                    print(f"[{r['id']}] report={r['change_report_id']} "
+                          f"webhook={r['webhook']} {r['status']}{http}"
+                          f" at {r['created_at']}{error}")
+            return 0
+        # send
+        if not getattr(config, "notify_enabled", False):
+            print("notify: disabled; set notify_enabled: true in settings "
+                  "and add notify_webhooks targets", file=sys.stderr)
+            return 2
+        try:
+            outcomes = dispatch_pending(
+                conn, config, report_id=args.report, limit=args.limit)
+        except NotifyError as exc:
+            print(f"notify send failed: {exc}", file=sys.stderr)
+            return 2
+        if args.json:
+            print(json.dumps(outcomes, indent=2))
+        else:
+            if not outcomes:
+                print("Nothing outstanding — every published report has "
+                      "been delivered to its pending targets.")
+            for item in outcomes:
+                line = f"report {args.report or '?'} {item['webhook']}: " \
+                       f"{item['status']}"
+                if item.get("http_status") is not None:
+                    line += f" (HTTP {item['http_status']})"
+                if item.get("error"):
+                    line += f" {item['error'][:160]}"
+                print(line)
+        failed = sum(1 for item in outcomes if item.get("status") == "failed")
+        return 1 if failed else 0
+    finally:
+        conn.close()
 
 
 def cmd_backup(args: argparse.Namespace) -> int:
@@ -905,6 +1023,8 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_eval(args)
     if args.command == "feedback":
         return cmd_feedback(args)
+    if args.command == "notify":
+        return cmd_notify(args)
     if args.command == "backup":
         return cmd_backup(args)
     parser.error(f"unknown command: {args.command}")

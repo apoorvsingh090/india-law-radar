@@ -87,12 +87,19 @@ def dashboard(ctx: dict) -> str:
         f"<li>{esc(g)}</li>" for g in ctx["coverage_gaps"]) or "<li>None.</li>"
     monitored = sum(1 for s in ctx["sources"] if s.get("monitored"))
     unhealthy = sum(1 for s in ctx["sources"] if not s.get("healthy", True))
+    notify_failures = ctx.get("notify_failures", 0)
+    notify_html = ("<p><span class=\"badge bad\">"
+                   f"{notify_failures} failed outbound notification(s)"
+                   "</span> in recent attempts. See report pages for "
+                   "per-target detail; <code>lawradar notify send</code> "
+                   "retries failed targets.</p>" if notify_failures else "")
     return (
         f"<p>{ctx['source_count']} configured sources · "
         f"{monitored} monitored, {unhealthy} need attention · "
         f"{ctx['pending_review']} pending reviews · "
         f"{ctx['unpublished']} unpublished reports</p>"
-        "<h3>Sources</h3><table><tr><th>ID</th><th>Name</th><th>State</th>"
+        + notify_html
+        + "<h3>Sources</h3><table><tr><th>ID</th><th>Name</th><th>State</th>"
         "<th>Health detail</th><th>Last success</th></tr>"
         + "".join(rows) + "</table>"
         + "<h3>Recent changes</h3><ul>" + (recent or "<li>None yet.</li>") + "</ul>"
@@ -131,8 +138,8 @@ def changes_feed(reports: list[dict], filters: dict,
 
 
 def report_detail(report: dict, document: dict, versions: list[dict],
-                   citations: list[dict], trail: list[dict],
-                   token: str = "") -> str:
+                  citations: list[dict], trail: list[dict],
+                  token: str = "", notifications: list[dict] | None = None) -> str:
     claims = json.loads(report["claims_json"])
     affected = json.loads(report["affected_sections"])
     versions_html = "".join(
@@ -153,6 +160,20 @@ def report_detail(report: dict, document: dict, versions: list[dict],
         f"<li>task {t['id']}: {esc(t['status'])} by {esc(t['reviewer'] or '—')} "
         f"— {esc(t['review_notes'] or t['reason'] or '')}</li>"
         for t in trail) or "<li>No review history yet.</li>"
+    notify_rows = "".join(
+        f"<tr><td>{esc(n['webhook'])}</td><td>{esc(n['status'])}</td>"
+        f"<td>{esc(n['http_status'] if n['http_status'] is not None else '—')}</td>"
+        f"<td>{esc(n['created_at'])}</td>"
+        f"<td>{esc((n['error'] or '—')[:200])}</td></tr>"
+        for n in (notifications or []))
+    notify_html = (
+        "<h3>Outbound notifications</h3>"
+        + ("<table><tr><th>Target</th><th>Status</th><th>HTTP</th>"
+           "<th>Attempted</th><th>Error</th></tr>" + notify_rows + "</table>")
+        + f"<p class=\"badge\">Last {len(notifications or [])} attempt(s) shown."
+        " Published reports are delivered at most once per target;"
+        " <code>lawradar notify send</code> retries failed targets.</p>"
+        if notifications else "")
     token_field = (f"<input type=\"hidden\" name=\"token\" value=\"{esc(token)}\">"
                    if token else "")
     form = (
@@ -197,6 +218,7 @@ def report_detail(report: dict, document: dict, versions: list[dict],
         + "<h3>Citations</h3><ul>" + cites_html + "</ul>"
         + "<h3>Audit diff</h3><pre>" + esc(report["diff_text"][:20000]) + "</pre>"
         + "<h3>Review history</h3><ul>" + trail_html + "</ul>"
+        + notify_html
         + "<h3>Human review</h3>" + form)
 
 

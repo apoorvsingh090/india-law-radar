@@ -1,10 +1,12 @@
-"""Stdlib web server (Milestone 10): no new dependencies.
+"""Stdlib web server (Milestone 11): no new dependencies.
 
 Serves the dashboard, change feed, report detail, search, source
 registry, review queue, coverage/privacy/limitations pages, feedback
 form, plus a small JSON API. State-changing POSTs are same-origin forms
 gated by an optional shared-secret token and a per-IP rate limit; bind
-defaults to loopback and non-loopback binds require --token.
+defaults to loopback and non-loopback binds require --token. After a
+human approval commits, an at-most-once webhook fan-out may fire — it
+never blocks or fails the review flow.
 """
 from __future__ import annotations
 
@@ -15,6 +17,7 @@ import time
 import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
+from lawradar import __version__
 from lawradar.db import store
 from lawradar.ingestion.health import evaluate_sources, summarize, with_health
 from lawradar.search import fts as search_fts
@@ -50,7 +53,7 @@ class RateLimiter:
 
 
 class Handler(BaseHTTPRequestHandler):
-    server_version = "IndiaLawRadar/0.10.0"
+    server_version = f"IndiaLawRadar/{__version__}"
 
     # -- helpers ---------------------------------------------------------
     def _db(self):
@@ -118,7 +121,18 @@ class Handler(BaseHTTPRequestHandler):
                                pages.feedback_page(
                                    report_id=query.get("report", [""])[0]))
                 elif path == "/health":
-                    self._json({"status": "ok", "version": "0.10.0"})
+                    self._json({"status": "ok", "version": __version__})
+                elif path == "/api/notifications":
+                    try:
+                        report = int(query.get("report", [""])[0])
+                    except ValueError:
+                        self._json({"error": "report must be an integer"},
+                                   400)
+                        return
+                    self._json([dict(r) for r in
+                                store.list_notification_attempts(
+                                    conn, change_report_id=report or None,
+                                    limit=100)])
                 elif path == "/feed.xml":
                     # Published-only Atom feed (M8): the review gate, not
                     # ingestion, decides what appears here.
@@ -183,7 +197,8 @@ class Handler(BaseHTTPRequestHandler):
             "sources": sources, "source_count": len(sources),
             "recent_reports": reports, "pending_review": pending,
             "failed_runs": failed, "coverage_gaps": gaps,
-            "unpublished": unpublished}))
+            "unpublished": unpublished,
+            "notify_failures": store.count_failed_attempts(conn)}))
 
     def _changes(self, conn, query: dict) -> None:
         filt = {k: query.get(k, [""])[0]
@@ -229,13 +244,17 @@ class Handler(BaseHTTPRequestHandler):
         citations = [dict(c) for c in
                      store.list_citations(conn, report_id)]
         document = store.get_document(conn, report["document_id"])
+        notifications = [dict(n) for n in
+                         store.list_notification_attempts(conn, report_id,
+                                                          limit=20)]
         from lawradar.review.queue import audit_trail
 
         self._page(f"Report {report_id}",
                    pages.report_detail(report, dict(document) if document else {},
                                         versions, citations,
                                         audit_trail(conn, report_id),
-                                        self._token_value(query)))
+                                        self._token_value(query),
+                                        notifications))
 
     def _api_report(self, conn, report_id: int) -> None:
         report = store.get_report(conn, report_id)
@@ -394,13 +413,15 @@ class Handler(BaseHTTPRequestHandler):
 
             conn = self._db()
             report_id = int(review_match.group(1))
+            approved = False
             try:
                 try:
-                    resolve(
+                    outcome = resolve(
                         conn, report_id=report_id,
                         decision=mapping[decision],
                         reviewer=form.get("reviewer", [""])[0],
                         notes=form.get("notes", [""])[0])
+                    approved = outcome.get("decision") == "approved"
                 except Exception as exc:  # noqa: BLE001 — user-facing error
                     conn.close()
                     self._page("Review refused",
@@ -410,6 +431,20 @@ class Handler(BaseHTTPRequestHandler):
                     return
             finally:
                 conn.close()
+            if approved:
+                # At-most-once fan-out; after_approval never raises, so a
+                # delivery problem cannot fail the committed review.
+                from lawradar.notify.dispatch import after_approval
+
+                try:
+                    notify_conn = self._db()
+                    try:
+                        after_approval(getattr(self.server, "config", None),
+                                       notify_conn, report_id)
+                    finally:
+                        notify_conn.close()
+                except Exception:  # noqa: BLE001, S110 — never fail review
+                    pass
             self._redirect(f"/reports/{report_id}")
         except BrokenPipeError:
             pass
@@ -468,23 +503,27 @@ class Handler(BaseHTTPRequestHandler):
 
 def build_server(db_path: str = "data/lawradar.db", host: str = "127.0.0.1",
                  port: int = 8080, token: str = "",
-                 post_limit_per_minute: int = 30) -> ThreadingHTTPServer:
+                 post_limit_per_minute: int = 30,
+                 config=None) -> ThreadingHTTPServer:
     """Create (but do not start) the web server."""
     server = ThreadingHTTPServer((host, port), Handler)
     server.db_path = db_path
     server.token = token or ""
     server.rate_limiter = RateLimiter(post_limit_per_minute)
+    server.config = config
     server.daemon_threads = True
     return server
 
 
 def serve_forever(db_path: str = "data/lawradar.db", host: str = "127.0.0.1",
                   port: int = 8080, token: str = "",
-                  post_limit_per_minute: int = 30) -> None:
+                  post_limit_per_minute: int = 30,
+                  config=None) -> None:
     """Block serving until interrupted."""
     from lawradar.db.lock import runtime_lock
 
-    server = build_server(db_path, host, port, token, post_limit_per_minute)
+    server = build_server(db_path, host, port, token, post_limit_per_minute,
+                          config)
     address = f"http://{server.server_address[0]}:{server.server_address[1]}"
     print(f"Serving {pages.APP_TITLE} at {address} (Ctrl-C to stop)")
     try:

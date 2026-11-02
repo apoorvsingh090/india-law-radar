@@ -22,3 +22,15 @@ ai_command: ""
 # Public-beta guards (Milestone 7): max state-changing POSTs per client IP
 # per minute. `serve` still refuses non-loopback binds without --token.
 post_limit_per_minute: 30
+# Outbound notifications (Milestone 11): after a human approval commits, the
+# report is POSTed as a signed JSON payload to every enabled webhook. Off by
+# default; secrets live only in this git-ignored file. Delivery is at most
+# once per (report, webhook); failures never block approval and are retried
+# explicitly with `lawradar notify send`.
+notify_enabled: false
+notify_timeout_seconds: 10
+notify_webhooks: []
+# publish_webhooks:  # example entry
+#   - name: team-relay
+#     url: https://hooks.example.test/india-law-radar
+#     secret: replace-with-a-long-random-string  # optional HMAC-SHA256 key

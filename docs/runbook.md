@@ -7,6 +7,9 @@
   next-due times, exit 1 when a monitored source needs attention
 - `lawradar sources list` — per-source `last_error`, `last_check`
 - `lawradar review --list` — human-actionable queue
+- `lawradar notify list` — webhook delivery attempts (audit/triage);
+  `/api/notifications` serves the same rows as JSON, and report pages
+  show the per-target history
 - `lawradar backup verify <file>` - newest snapshot trust check; see
   `docs/backup.md` for the restore drill
 - Dashboard `/` — ingestion failures + coverage warnings section
@@ -29,6 +32,8 @@
 | `watch` skips a source (`not due until …`) | poll interval not elapsed | Nothing to do — the schedule is working; force with `lawradar ingest <id>` if you must |
 | `watch` skips a source (`manual_import`) | by design | Humans supply the file: `lawradar ingest <id> --file PATH` (see `docs/pilot.md`) |
 | `/feed.xml` missing an expected report | report not approved yet | `review --list`, then `--approve` with notes — the feed only ever lists published reports |
+| report page shows a `failed` notification; dashboard shows failed outbound deliveries | webhook target refused (HTTP 4xx/5xx, DNS, timeout) | Check the target URL/secret in settings, fix the receiver, then `lawradar notify send` (idempotent; delivered targets are skipped). Exit 1 means some target still failed |
+| `notify send` exits 2 | notifications disabled or target config invalid | Set `notify_enabled: true` + valid `notify_webhooks` in settings (http/https URLs, unique target names); nothing was sent in that case |
 | `sources health` → `FAILED` (`stale`) | no successful sweep within `2 x poll_interval` (min 15m) | Check the scheduler/watch log, then `lawradar ingest <id>` once. If it succeeds, health clears; if not, apply the matching error row above |
 | `sources health` → `failing` | the most recent check recorded `last_error` | Fix the cause, re-run `lawradar ingest <id>` (or wait for the next sweep) — success clears the error |
 | `sources health` ignores a source | `manual`, `disabled`, or `retired` | By design: only enabled automated sources affect the exit code. Manual files still need `lawradar ingest <id> --file PATH`; retired means the id was removed from the registry (history is kept, alerts stop) |
@@ -50,6 +55,8 @@ lawradar ingest --all
 lawradar reports generate
 # Re-run citation checks after a source correction
 lawradar reports verify <report-id>
+# Retry outstanding webhook deliveries (idempotent; exit 1 = still failing)
+lawradar notify send
 # Bounded regression after any pipeline change
 lawradar eval            # expect 7/7; exit 1 otherwise
 pytest                   # full suite

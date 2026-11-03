@@ -169,3 +169,11 @@ CLI (argparse) → config.py → logging_config.py → local data dir + sqlite
   a required member for v2 (present, hashed, UTF-8, Markdown-shaped).
   Format version 1 bundles stay verifiable, which keeps older exports
   trustworthy without a re-export.
+- M21 adds: filter parity on the JSON API. `/api/documents` is new, and
+  `/api/reports` + `/api/search` forward the same query grammar the CLI
+  and pages use into the same store/search functions. Query parsing is
+  centralised (`_query_limit`, `_query_since`): invalid input is a 400
+  naming the parameter, limits clamp to 500, and `since` converts a
+  calendar date to the UTC-midnight stamp the store compares against.
+  The API therefore cannot return rows the browser/CLI would filter
+  differently.

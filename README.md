@@ -5,18 +5,18 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
 Source-verifiable monitoring of official Indian legal documents.
-**Milestone 20 (this release):** evidence bundles now carry the
-readable brief - `bundles create` additionally writes `brief.md`
-(the exact `reports brief` page) into the ZIP, so one approved report
-exports as both a verifiable artifact and a human-readable document.
-The manifest hashes it like every other member, `bundles verify`
-rejects a tampered or missing brief in format v2, and bundles exported
-before this milestone (format v1, no brief) still verify. Builds on
-M19 web filters, M18 CLI filters, M17 durable SQLite connections, M16
-the status page, M15 shareable briefs, M14 operator status, M13
-conditional polling, M12 evidence bundles, M11 webhook notifications,
-M10 verifiable backups, M9 source health, the M8 radar loop, and
-`docs/pilot.md`. Still zero paid dependencies.
+**Milestone 21 (this release):** JSON API parity - `/api/documents` is
+new, and `/api/reports` and `/api/search` accept the same filters as
+the CLI and web (`source`, `type`, `jurisdiction`, `status`,
+`change_type`, `since=YYYY-MM-DD`, `limit`). Bad integers or dates
+return a 400 with the offending parameter named; limits are clamped to
+1-500. Scripts can now select exactly the rows the browser shows.
+Builds on M20 briefs inside bundles, M19 web filters, M18 CLI filters,
+M17 durable SQLite connections, M16 the status page, M15 shareable
+briefs, M14 operator status, M13 conditional polling, M12 evidence
+bundles, M11 webhook notifications, M10 verifiable backups, M9 source
+health, the M8 radar loop, and `docs/pilot.md`. Still zero paid
+dependencies.
 
 > Scope honesty: this MVP does **not** claim complete coverage of Indian law,
 > is not a substitute for a qualified advocate, and every future change report
@@ -55,7 +55,7 @@ lawradar serve
 Expected: `lawradar health` prints `health: OK` with three PASS lines;
 `pytest` passes (unit + integration).
 
-## CLI (Milestone 20)
+## CLI (Milestone 21)
 
 ```text
 lawradar init [--force]        dirs + config + migrate sqlite schema
@@ -210,7 +210,8 @@ data/          local-only runtime data (git-ignored except README/.gitkeep)
 - M17: WAL + busy-timeout durable SQLite connections (done)
 - M18: CLI list/search filters for documents and reports (done)
 - M19: web documents browser + filtered search (done)
-- M20: readable brief embedded in evidence bundles (format v2) (done here)
+- M20: readable brief embedded in evidence bundles (format v2) (done)
+- M21: JSON API filters + `/api/documents` (done here)
 
 ## Safeguards
 

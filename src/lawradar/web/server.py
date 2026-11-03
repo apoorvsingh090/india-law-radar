@@ -15,6 +15,7 @@ import json
 import re
 import time
 import urllib.parse
+from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from types import SimpleNamespace
@@ -174,12 +175,48 @@ class Handler(BaseHTTPRequestHandler):
                         self._json({"error": "document must be an integer"},
                                    400)
                         return
-                    rows = store.list_reports(conn, limit=50,
-                                              document_id=doc_id)
+                    limit = self._query_limit(query)
+                    if limit is None:
+                        self._json({"error": "limit must be a positive integer"},
+                                   400)
+                        return
+                    since = self._query_since(query)
+                    if since is False:
+                        self._json({"error": "since must be YYYY-MM-DD"},
+                                   400)
+                        return
+                    rows = store.list_reports_filtered(
+                        conn, document_id=doc_id,
+                        source=query.get("source", [""])[0] or None,
+                        jurisdiction=query.get("jurisdiction", [""])[0] or None,
+                        doc_type=query.get("type", [""])[0] or None,
+                        verification=query.get("status", [""])[0] or None,
+                        change_type=query.get("change_type", [""])[0] or None,
+                        since=since, limit=limit)
+                    self._json([dict(r) for r in rows])
+                elif path == "/api/documents":
+                    limit = self._query_limit(query)
+                    if limit is None:
+                        self._json({"error": "limit must be a positive integer"},
+                                   400)
+                        return
+                    rows = store.list_documents(
+                        conn, limit=limit,
+                        source=query.get("source", [""])[0] or None,
+                        doc_type=query.get("type", [""])[0] or None,
+                        jurisdiction=query.get("jurisdiction", [""])[0] or None)
                     self._json([dict(r) for r in rows])
                 elif path == "/api/search":
+                    limit = self._query_limit(query)
+                    if limit is None:
+                        self._json({"error": "limit must be a positive integer"},
+                                   400)
+                        return
                     self._json(search_fts.search(
-                        conn, query.get("q", [""])[0]))
+                        conn, query.get("q", [""])[0], limit,
+                        source=query.get("source", [""])[0] or None,
+                        doc_type=query.get("type", [""])[0] or None,
+                        jurisdiction=query.get("jurisdiction", [""])[0] or None))
                 elif (match := re.fullmatch(
                         r"/reports/(\d+)/brief\.md", path)):
                     from lawradar.ingestion.health import format_utc, utc_now
@@ -224,6 +261,29 @@ class Handler(BaseHTTPRequestHandler):
         if not getattr(self.server, "token", ""):
             return ""
         return query.get("token", [""])[0]
+
+    def _query_limit(self, query: dict, default: int = 50) -> int | None:
+        raw = query.get("limit", [""])[0]
+        if not raw:
+            return default
+        try:
+            value = int(raw)
+        except (TypeError, ValueError):
+            return None
+        if value < 1:
+            return None
+        return min(value, 500)
+
+    def _query_since(self, query: dict) -> str | None | bool:
+        """UTC midnight ISO stamp from ``since=YYYY-MM-DD``; False = invalid."""
+        raw = query.get("since", [""])[0]
+        if not raw:
+            return None
+        try:
+            day = datetime.strptime(raw, "%Y-%m-%d")
+        except ValueError:
+            return False
+        return day.strftime("%Y-%m-%dT00:00:00.000Z")
 
     def _dashboard(self, conn) -> None:
         sources = with_health([dict(r) for r in store.list_sources(conn)])

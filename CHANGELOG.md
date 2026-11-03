@@ -5,6 +5,18 @@ All notable changes to India Law Radar will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.21.0] - 2026-11-03
+
+### Added
+
+- Milestone 21 (JSON API parity): `GET /api/documents` lists documents
+  with `source`/`type`/`jurisdiction`/`limit` filters
+- `GET /api/reports` now accepts `document`, `source`, `jurisdiction`,
+  `type`, `status`, `change_type`, `since=YYYY-MM-DD`, and `limit`;
+  `GET /api/search` accepts `source`/`type`/`jurisdiction`/`limit`
+- Invalid `limit` (non-integer or < 1) and malformed `since` return
+  HTTP 400 with the offending parameter named; limits clamp at 500
+
 ## [0.20.0] - 2026-11-03
 
 ### Added

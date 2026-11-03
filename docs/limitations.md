@@ -1,4 +1,4 @@
-# Limitations (public disclosure — Milestone 20)
+# Limitations (public disclosure — Milestone 21)
 
 - Coverage: only the sources shown on `/sources` that are actually ingested.
   The pilot set is small (see `docs/coverage.md`); no completeness claim is made.

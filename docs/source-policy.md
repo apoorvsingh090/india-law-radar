@@ -11,6 +11,11 @@
 5. Preserve issuing authority vs hosting repository vs instrument distinction.
 6. A failed run must not mark a source successfully checked; a missing
    document is not a repeal without evidence.
+7. Poll politely: reuse HTTP validators (`If-None-Match` /
+   `If-Modified-Since`) so an unchanged official page costs one small
+   request. A `304` is recorded as a healthy, unchanged check - never as
+   a skipped one - and rate limits still apply on every request,
+   including conditional ones.
 
 Real-source verification status:
 
@@ -22,4 +27,6 @@ Real-source verification status:
   `terms: not_reviewed`; enabling anything requires the checks in
   `docs/coverage.md`.
 - M2 `http_poll` only probes a source's own base URL under the allowlist;
-  per-document discovery remains gated on terms verification.
+  per-document discovery remains gated on terms verification. M13 adds
+  conditional polling (cached `ETag`/`Last-Modified`, `304` = unchanged)
+  for these probes; no new hosts or discovery paths are enabled.

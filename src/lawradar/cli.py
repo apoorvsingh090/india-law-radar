@@ -1,4 +1,4 @@
-"""Command-line interface for India Law Radar (Milestone 12).
+"""Command-line interface for India Law Radar (Milestone 13).
 
 Implemented commands (all functional, no placeholders):
   lawradar init              — create data dir, local settings.yaml, migrate db
@@ -303,7 +303,7 @@ def cmd_init(args: argparse.Namespace) -> int:
     return 0
 
 
-APP_LABEL = f"India Law Radar v{__version__} (Milestone 12)"
+APP_LABEL = f"India Law Radar v{__version__} (Milestone 13)"
 
 
 def _sqlite_path(db_url: str, data_dir: Path) -> Path | None:
@@ -520,6 +520,7 @@ def cmd_ingest(args: argparse.Namespace) -> int:
                   f"(discovered={run.get('discovered', 0)} "
                   f"downloaded={run.get('downloaded', 0)} "
                   f"changed={run.get('changed', 0)} "
+                  f"unchanged={run.get('unchanged', 0)} "
                   f"failed={run.get('failed', 0)})")
             for err in run.get("errors", []):
                 print(f"  error: {err}")
@@ -540,7 +541,8 @@ def cmd_watch(args: argparse.Namespace) -> int:
             return  # dumped once, at the end
         for source_id, run in zip(result.ingested, result.runs):
             print(f"[sweep {result.sweep}] {source_id}: {run['status']} "
-                  f"(changed={run.get('changed', 0)} "
+                  f"(unchanged={run.get('unchanged', 0)} "
+                  f"changed={run.get('changed', 0)} "
                   f"failed={run.get('failed', 0)})")
             for err in run.get("errors", []):
                 print(f"  error: {err}")
@@ -612,6 +614,12 @@ def cmd_documents(args: argparse.Namespace) -> int:
                 print(f"  source={doc['source_id']} ref={doc['source_document_id']} "
                       f"type={doc['document_type']} authority={doc['issuing_authority']}")
                 print(f"  official_url={doc['official_url']}")
+                validated = doc["http_validated_at"] or "(never)"
+                if validated != "(never)":
+                    etag = doc["http_etag"] or "(none)"
+                    last_mod = doc["http_last_modified"] or "(none)"
+                    print(f"  last validated={validated} etag={etag[:24]} "
+                          f"last_modified={last_mod[:24]}")
                 for v in versions:
                     print(f"  v{v['version_number']} sha={v['content_sha256'][:12]}… "
                           f"extraction={v['extraction_status']} "

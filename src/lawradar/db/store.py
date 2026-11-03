@@ -678,6 +678,24 @@ def get_evidence_bundle(conn: sqlite3.Connection,
     ).fetchone()
 
 
+# -- conditional fetch validators (M13) ---------------------------------------
+
+def find_document_for_url(conn: sqlite3.Connection, source_id: str,
+                          url: str) -> sqlite3.Row | None:
+    return conn.execute(
+        "SELECT * FROM documents WHERE source_id=? AND source_document_id=?",
+        (source_id, url)).fetchone()
+
+
+def update_http_validators(conn: sqlite3.Connection, document_id: int,
+                           *, etag: str, last_modified: str,
+                           validated_at: str) -> None:
+    conn.execute(
+        "UPDATE documents SET http_etag=?, http_last_modified=?, "
+        "http_validated_at=? WHERE id=?",
+        (etag[:512], last_modified[:512], validated_at, document_id))
+
+
 # -- user feedback (M7) ------------------------------------------------------
 
 def add_feedback(

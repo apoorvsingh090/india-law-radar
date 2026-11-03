@@ -13,11 +13,17 @@ from __future__ import annotations
 
 import urllib.parse
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from pathlib import Path
 
 from lawradar.db import store
 from lawradar.extraction.text import extract_text
-from lawradar.ingestion.fetcher import FetchError, RateLimiter, fetch_url
+from lawradar.ingestion.fetcher import (
+    FetchError,
+    FetchResult,
+    RateLimiter,
+    fetch_url,
+)
 from lawradar.ingestion.hashing import sha256_bytes
 from lawradar.search import fts as search_fts
 from lawradar.sources import fixture as fixture_adapter
@@ -48,6 +54,10 @@ def _data_dir(config) -> Path:
     path = Path(config.data_dir)
     path.mkdir(parents=True, exist_ok=True)
     return path
+
+
+def _utc_now_iso() -> str:
+    return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def ingest_bytes(
@@ -192,19 +202,28 @@ def ingest_manual_file(
 
 
 def _fetch_http_document(
-    config, source: SourceRecord, url: str, limiter: RateLimiter
-) -> tuple[bytes, str, str]:
-    """Fetch one official URL under the allowlist policy."""
+    config,
+    source: SourceRecord,
+    limiter: RateLimiter,
+    *,
+    cached=None,
+) -> FetchResult:
+    """Fetch one official URL under the allowlist policy.
+
+    Reuses the document's cached validators (M13) so unchanged sources
+    can answer 304 (``not_modified``) without a body.
+    """
     hosts = {(urllib.parse.urlparse(source.base_url).hostname or "").lower()}
-    result = fetch_url(
-        url,
+    return fetch_url(
+        source.base_url,
         hosts,
         timeout_seconds=config.http_timeout_seconds,
         max_bytes=config.http_max_bytes,
         rate_limiter=limiter,
         min_interval_seconds=source.rate_limit_seconds,
+        etag=(cached["http_etag"] if cached else "") or "",
+        last_modified=(cached["http_last_modified"] if cached else "") or "",
     )
-    return result.data, result.content_type, result.final_url
 
 
 def ingest_source(
@@ -220,7 +239,7 @@ def ingest_source(
 ) -> dict:
     """Ingest one source; returns a run summary dict (never raises)."""
     run_id = store.create_run(conn, source.id)
-    discovered = downloaded = changed = failed = 0
+    discovered = downloaded = changed = failed = unchanged = 0
     errors: list[str] = []
     limiter = RateLimiter(source.rate_limit_seconds)
     try:
@@ -278,29 +297,49 @@ def ingest_source(
                 raise ValueError("http_poll source has no fetchable host")
             # M2: http_poll discovers a single URL — the base URL itself —
             # as a smoke probe. Real per-document discovery lands in M6
-            # after per-source terms verification.
+            # after per-source terms verification. M13: conditional
+            # requests reuse the cached validators so unchanged URLs
+            # answer 304 and cost no download.
             discovered += 1
             try:
-                data, ctype, final_url = _fetch_http_document(
-                    config, source, source.base_url, limiter
-                )
-                result = ingest_bytes(
-                    conn,
-                    source_id=source.id,
-                    source_document_id=final_url,
-                    title=f"{source.name} — {final_url}",
-                    raw_bytes=data,
-                    content_type=ctype,
-                    filename=final_url,
-                    issuing_authority=source.name,
-                    jurisdiction=source.jurisdiction,
-                    official_url=final_url,
-                    storage_policy=source.storage_policy,
-                    data_dir=_data_dir(config),
-                )
-                downloaded += 1
-                if result.status in ("new_document", "new_version"):
-                    changed += 1
+                cached = store.find_document_for_url(
+                    conn, source.id, source.base_url)
+                result = _fetch_http_document(
+                    config, source, limiter, cached=cached)
+                if result.not_modified:
+                    unchanged += 1
+                    if cached is not None:
+                        store.update_http_validators(
+                            conn, int(cached["id"]),
+                            etag=cached["http_etag"] or "",
+                            last_modified=cached["http_last_modified"] or "",
+                            validated_at=_utc_now_iso())
+                else:
+                    payload = ingest_bytes(
+                        conn,
+                        source_id=source.id,
+                        source_document_id=result.final_url,
+                        title=f"{source.name} — {result.final_url}",
+                        raw_bytes=result.data,
+                        content_type=result.content_type,
+                        filename=result.final_url,
+                        issuing_authority=source.name,
+                        jurisdiction=source.jurisdiction,
+                        official_url=result.final_url,
+                        storage_policy=source.storage_policy,
+                        data_dir=_data_dir(config),
+                    )
+                    downloaded += 1
+                    if payload.status in ("new_document", "new_version"):
+                        changed += 1
+                    document = store.find_document_for_url(
+                        conn, source.id, result.final_url)
+                    if document is not None:
+                        store.update_http_validators(
+                            conn, int(document["id"]),
+                            etag=result.etag,
+                            last_modified=result.last_modified,
+                            validated_at=_utc_now_iso())
             except (FetchError, ValueError) as exc:
                 failed += 1
                 errors.append(str(exc))
@@ -320,7 +359,7 @@ def ingest_source(
         store.record_source_check(conn, source.id, False, "; ".join(errors))
         conn.commit()
         return {"run_id": run_id, "status": "failed", "changed": changed,
-                "failed": failed, "errors": errors}
+                "unchanged": unchanged, "failed": failed, "errors": errors}
     # A run with any failure is never recorded as a success: only a clean
     # run updates last_success_at. Partial progress keeps its errors visible
     # on both the run row and the source row.
@@ -337,8 +376,8 @@ def ingest_source(
     store.record_source_check(conn, source.id, clean, "; ".join(errors))
     conn.commit()
     return {"run_id": run_id, "status": status, "discovered": discovered,
-            "downloaded": downloaded, "changed": changed, "failed": failed,
-            "errors": errors}
+            "downloaded": downloaded, "changed": changed,
+            "unchanged": unchanged, "failed": failed, "errors": errors}
 
 
 def sync_registry(conn, sources: list[SourceRecord]) -> int:

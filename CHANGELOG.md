@@ -5,6 +5,31 @@ All notable changes to India Law Radar will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.13.0] - 2026-11-03
+
+### Added
+
+- Milestone 13 (conditional HTTP polling): `http_poll` documents now
+  cache the official server's `ETag` / `Last-Modified` validators
+  (migration `008` adds `documents.http_etag`,
+  `documents.http_last_modified`, `documents.http_validated_at`) and
+  send them as `If-None-Match` / `If-Modified-Since` on subsequent
+  sweeps
+- A `304 Not Modified` answer is a healthy, unchanged check: no bytes
+  are downloaded, no version or change report is created, the source's
+  last-success time is refreshed, and the validator timestamp is
+  stamped; `lawradar ingest` and `lawradar watch` report the count as
+  `unchanged` (with `--json` included in the summary)
+- Successful responses store their new validators, so a genuine edit
+  still flows through the normal new-version -> diff -> report path
+- `lawradar documents show <id>` prints the cached validators and the
+  last-validated time
+
+### Notes
+
+- Servers that ignore conditional headers keep working exactly as
+  before (they answer `200`, which is always accepted).
+
 ## [0.12.0] - 2026-11-03
 
 ### Added

@@ -34,6 +34,9 @@ class FetchResult:
     status: int
     content_type: str
     host: str
+    not_modified: bool = False
+    etag: str = ""
+    last_modified: str = ""
 
 
 class RateLimiter:
@@ -90,8 +93,18 @@ def fetch_url(
     rate_limiter: RateLimiter | None = None,
     min_interval_seconds: float = 1.0,
     max_retries: int = 3,
+    etag: str = "",
+    last_modified: str = "",
 ) -> FetchResult:
-    """Fetch a URL under the allowlist policy. Raises FetchError on failure."""
+    """Fetch a URL under the allowlist policy. Raises FetchError on failure.
+
+    When cached conditional validators (``etag`` / ``last_modified``,
+    M13) are supplied, the request carries ``If-None-Match`` /
+    ``If-Modified-Since``; a ``304 Not Modified`` answer returns a
+    ``FetchResult`` with ``not_modified=True`` and no body instead of an
+    error, and the new validators from any successful response are
+    reported back.
+    """
     if not allowlist:
         raise FetchError("refusing to fetch: allowlist is empty")
     parts = _check_url(url, allowlist)
@@ -102,9 +115,12 @@ def fetch_url(
     for attempt in range(1, max_retries + 1):
         try:
             limiter.wait(host)
-            request = urllib.request.Request(
-                url, headers={"User-Agent": USER_AGENT}
-            )
+            headers = {"User-Agent": USER_AGENT}
+            if etag:
+                headers["If-None-Match"] = etag
+            if last_modified:
+                headers["If-Modified-Since"] = last_modified
+            request = urllib.request.Request(url, headers=headers)
             with opener.open(request, timeout=timeout_seconds) as response:
                 status = getattr(response, "status", 200)
                 final_url = response.geturl()
@@ -144,10 +160,18 @@ def fetch_url(
                     status=status,
                     content_type=content_type,
                     host=host,
+                    etag=response.headers.get("ETag", "") or "",
+                    last_modified=response.headers.get("Last-Modified", "")
+                    or "",
                 )
         except FetchError:
             raise  # policy errors are never retried
         except urllib.error.HTTPError as exc:
+            if exc.code == 304:
+                # Conditional validators still hold: nothing changed.
+                return FetchResult(
+                    data=b"", final_url=url, status=304,
+                    content_type="", host=host, not_modified=True)
             if 500 <= (exc.code or 0) < 600 and attempt < max_retries:
                 last_error = exc
                 time.sleep(2 ** (attempt - 1))

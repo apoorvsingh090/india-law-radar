@@ -50,7 +50,12 @@ Out of scope:
   content-addressed evidence, not an anti-tamper seal. Verify with
   `lawradar bundles verify` and compare against the `evidence_bundles`
   audit table on the exporting machine.
+- Conditional polling (M13) trusts the official server's `304` answer:
+  a compromised or misconfigured origin can suppress changes by lying
+  about validators. `304` handling never bypasses the allowlist,
+  TLS verification, size caps, or rate limits; validators are capped in
+  length and stored as opaque strings.
 
 ## Supported versions
 
-Only the latest code on `main` (currently `0.12.0`) is supported.
+Only the latest code on `main` (currently `0.13.0`) is supported.

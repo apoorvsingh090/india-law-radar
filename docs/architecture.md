@@ -98,3 +98,16 @@ CLI (argparse) → config.py → logging_config.py → local data dir + sqlite
   are unkeyed - like backups, they prove integrity against corruption,
   not against an attacker who can rewrite the archive and its manifest
   together.
+- M13 adds: conditional polling in `ingestion/fetcher.py`. Each
+  `http_poll` document caches the response `ETag` and `Last-Modified`
+  (migration `008`: `documents.http_etag`, `http_last_modified`,
+  `http_validated_at`). The fetcher replays them as `If-None-Match` /
+  `If-Modified-Since`; `urllib` surfaces `304` as `HTTPError`, which the
+  fetcher converts into a `FetchResult(not_modified=True)` instead of a
+  failure. The pipeline then skips ingest entirely, counts the check as
+  `unchanged`, refreshes the validator timestamp, and still marks the
+  source successfully checked - a `304` is positive evidence that the
+  official page is reachable and unchanged, not a skipped sweep. New
+  validators from `200` responses replace the cached ones after the
+  version is stored; servers that ignore validators behave exactly as
+  before.

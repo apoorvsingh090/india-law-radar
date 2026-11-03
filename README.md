@@ -5,18 +5,19 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
 Source-verifiable monitoring of official Indian legal documents.
-**Milestone 12 (this release):** portable evidence bundles - `lawradar
-bundles create <report-id>` exports one approved report as a single
-ZIP archive (report record with citations and review history, the
-deterministic diff, and the original document bytes when stored)
-with a manifest that hashes every member; `lawradar bundles verify`
-fails closed on any tampering. Exports are refused for unpublished
-drafts and when the stored original no longer matches its SHA-256.
-Builds on M11 webhook notifications (`notify list` / `notify send`),
-M10 verifiable backups, M9 source health (`lawradar sources health`,
-stale/failing sweeps exit 1), the M8 radar loop (`lawradar watch`,
-Atom feed of **approved** reports), and `docs/pilot.md`. Still zero
-paid dependencies.
+**Milestone 13 (this release):** polite conditional polling - every
+`http_poll` document is re-checked with `If-None-Match` /
+`If-Modified-Since` using validators cached from the previous sweep
+(migration `008`). When the official source answers `304 Not Modified`
+nothing is downloaded, no version is created, the run stays green, and
+the source's last-validated time is refreshed; `ingest`/`watch` report
+it as `unchanged`. New `ETag`/`Last-Modified` values are stored on each
+changed response, so a real edit still produces a version, a diff, and
+a change report. Builds on M12 evidence bundles (`lawradar bundles
+create` / `verify`), M11 webhook notifications, M10 verifiable backups,
+M9 source health (`lawradar sources health`, stale/failing sweeps exit
+1), the M8 radar loop (`lawradar watch`, Atom feed of **approved**
+reports), and `docs/pilot.md`. Still zero paid dependencies.
 
 > Scope honesty: this MVP does **not** claim complete coverage of Indian law,
 > is not a substitute for a qualified advocate, and every future change report
@@ -55,7 +56,7 @@ lawradar serve
 Expected: `lawradar health` prints `health: OK` with three PASS lines;
 `pytest` passes (unit + integration).
 
-## CLI (Milestone 12)
+## CLI (Milestone 13)
 
 ```text
 lawradar init [--force]        dirs + config + migrate sqlite schema
@@ -119,6 +120,16 @@ members, missing members, hash drift, wrong sidecar), mirroring the
 M10 backup semantics. Every export is recorded in the
 `evidence_bundles` audit table and shown on the report page.
 
+Conditional polling (M13): after the first successful fetch, each
+`http_poll` document stores the official server's `ETag` and
+`Last-Modified` values plus a last-validated timestamp. Later sweeps
+send them back as `If-None-Match` / `If-Modified-Since`; a `304` means
+"checked, unchanged" - the run is healthy, nothing is downloaded or
+versioned, and the validator timestamp is refreshed. `lawradar
+documents show <id>` prints the cached validators, and `ingest` /
+`watch` summaries include an `unchanged` counter. Servers that ignore
+validators simply return `200` and behave exactly as before.
+
 Try without network: `lawradar ingest fixture-sample --sources-file
 config/sources.example.yaml` twice — the second run reports `changed=0`
 (idempotent dedup). All fixture titles carry a `[FIXTURE]` marker and
@@ -141,8 +152,8 @@ src/lawradar/  cli, config, logging, db/store + db/backup, sources/*,
                reporting/*, review/*, ai/*, notify/dispatch (webhooks),
                evidence/* (bundles), search/fts, web/* (incl. Atom feed),
                evaluation/*
-migrations/    001-007 (schema, ai_attempts, FTS index, feedback, retirement,
-               notifications, bundles)
+migrations/    001-008 (schema, ai_attempts, FTS index, feedback, retirement,
+               notifications, bundles, http validators)
 tests/         unit + integration + fixtures + evaluation notes
 scripts/       operator helpers (probe script; daily pilot loop is CLI-only)
 data/          local-only runtime data (git-ignored except README/.gitkeep)
@@ -161,7 +172,8 @@ data/          local-only runtime data (git-ignored except README/.gitkeep)
 - M9: source health/staleness, dashboard + API signals, scheduler exit code (done)
 - M10: verifiable SQLite backups, restore with safety snapshot (done)
 - M11: outbound webhook notifications of approved reports (done)
-- M12: offline-verifiable evidence bundle exports (done here)
+- M12: offline-verifiable evidence bundle exports (done)
+- M13: conditional HTTP polling with cached validators (done here)
 
 ## Safeguards
 

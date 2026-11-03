@@ -40,6 +40,8 @@
 | `bundles create` -> `hash mismatch` for the version | stored raw file no longer matches `content_sha256` | Do NOT export or share this bundle. Treat the raw store as suspect: run `lawradar backup verify` on a recent snapshot, investigate both, re-ingest the document if it was tampered after download |
 | `bundles verify` -> `manifest hash mismatch` / missing or unexpected member | the zip changed after export (partial copy or tampering) | Do not cite it as evidence. Re-copy from the trusted source, or re-export with `lawradar bundles create` and compare checksums against `bundles list` |
 | `bundles list` shows no rows for an old export | export predates migration `007` or the audit row was lost | The zip may still be valid - run `lawradar bundles verify PATH` on the artifact itself; verification never depends on the DB |
+| `watch`/`ingest` reports `unchanged=1`, `downloaded=0` | expected: the official server answered `304 Not Modified` to the cached validators | Nothing to fix - the URL was checked and had not changed. `lawradar documents show <id>` shows the cached `etag`/`last_modified` and last-validated time |
+| every sweep still downloads the same bytes (`changed=0`) | the server ignores conditional headers, or a redirect change reset the cached validators | Harmless: dedup still prevents duplicate versions. Note the source's validator behavior in coverage notes when you rely on its `304`s |
 | `sources health` → `FAILED` (`stale`) | no successful sweep within `2 x poll_interval` (min 15m) | Check the scheduler/watch log, then `lawradar ingest <id>` once. If it succeeds, health clears; if not, apply the matching error row above |
 | `sources health` → `failing` | the most recent check recorded `last_error` | Fix the cause, re-run `lawradar ingest <id>` (or wait for the next sweep) — success clears the error |
 | `sources health` ignores a source | `manual`, `disabled`, or `retired` | By design: only enabled automated sources affect the exit code. Manual files still need `lawradar ingest <id> --file PATH`; retired means the id was removed from the registry (history is kept, alerts stop) |
@@ -66,6 +68,8 @@ lawradar notify send
 # Export + verify evidence for one approved report (safe to repeat)
 lawradar bundles create <report-id>
 lawradar bundles verify data\bundles\lawradar-evidence-r<id>-<UTC>.zip
+# Inspect cached conditional validators for a polled document
+lawradar documents show <document-id>
 # Bounded regression after any pipeline change
 lawradar eval            # expect 7/7; exit 1 otherwise
 pytest                   # full suite

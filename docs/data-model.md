@@ -56,3 +56,12 @@ audit trail (path is unique so re-exports never overwrite, `sha256` and
 byte size of the artifact, `has_document` flag). `change_report_id` is
 `ON DELETE SET NULL` so history survives report deletion; the bundle
 ZIP itself stays verifiable offline via its embedded manifest.
+
+**Milestone 13 update:** `008` adds three columns to `documents`:
+`http_etag`, `http_last_modified` (the official server's validators
+from the last `200`), and `http_validated_at` (the last time the URL
+answered at all, including `304`). Validators are per document because
+the polled URL is the document identity; they let the next sweep send
+`If-None-Match` / `If-Modified-Since` and skip downloading unchanged
+bytes. Empty strings mean "no validator cached" and produce a plain
+unconditional request.

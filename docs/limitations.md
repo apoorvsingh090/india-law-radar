@@ -1,4 +1,4 @@
-# Limitations (public disclosure — Milestone 12)
+# Limitations (public disclosure — Milestone 13)
 
 - Coverage: only the sources shown on `/sources` that are actually ingested.
   The pilot set is small (see `docs/coverage.md`); no completeness claim is made.
@@ -31,6 +31,14 @@
   files, not a determined attacker who rewrites both the archive and
   its manifest. Verify with `lawradar bundles verify` before trusting
   any bundle you did not export yourself.
+- Conditional polling: `304 Not Modified` depends on the official server
+  honouring `If-None-Match` / `If-Modified-Since`, and on that server's
+  own cache correctness. A wrong validator means a real change can be
+  missed until the server rotates it; servers that ignore validators
+  simply re-download (the old behavior). Validators are cached per
+  probed URL, so a redirect change starts an unconditional fetch again.
+  A `304` proves reachability and no-change per HTTP, not legal
+  non-amendment.
 - Backups: `lawradar backup create` snapshots the SQLite DB, not raw/text
   corpora, config, or secrets. Snapshots are unencrypted and only as good
   as their off-host copy; a `.db` without its checksum/manifest sidecars is

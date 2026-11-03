@@ -47,6 +47,41 @@ class _Handler(BaseHTTPRequestHandler):
                 self.send_header("Content-Length", str(len(body)))
                 self.end_headers()
                 self.wfile.write(body)
+        elif self.path == "/echo-conditional":
+            inm = self.headers.get("If-None-Match", "")
+            ims = self.headers.get("If-Modified-Since", "")
+            body = (f"If-None-Match: {inm}\n"
+                    f"If-Modified-Since: {ims}\n").encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "text/plain")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+        elif self.path == "/etagged":
+            if self.headers.get("If-None-Match") == '"act-1"':
+                self.send_response(304)
+                self.end_headers()
+                return
+            body = b"The Sample Act, as notified."
+            self.send_response(200)
+            self.send_header("Content-Type", "text/plain")
+            self.send_header("ETag", '"act-1"')
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+        elif self.path == "/lastmod":
+            stamp = "Wed, 21 Oct 2015 07:28:00 GMT"
+            if self.headers.get("If-Modified-Since") == stamp:
+                self.send_response(304)
+                self.end_headers()
+                return
+            body = b"The Sample Act, as notified."
+            self.send_response(200)
+            self.send_header("Content-Type", "text/plain")
+            self.send_header("Last-Modified", stamp)
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
         else:
             self.send_response(404)
             self.end_headers()
@@ -108,6 +143,47 @@ def test_oversize_response_rejected(server):
 def test_500_retried_then_succeeds(server):
     result = fetch_url(f"{server}/flaky", ALLOW)
     assert result.data == b"recovered"
+
+
+def test_conditional_headers_sent_with_cached_validators(server):
+    result = fetch_url(f"{server}/echo-conditional", ALLOW,
+                       etag='"old-etag"',
+                       last_modified="Mon, 01 Jan 2024 00:00:00 GMT")
+    assert result.status == 200
+    assert b'If-None-Match: "old-etag"' in result.data
+    assert b"If-Modified-Since: Mon, 01 Jan 2024 00:00:00 GMT" in result.data
+
+
+def test_no_conditional_headers_without_cached_validators(server):
+    result = fetch_url(f"{server}/echo-conditional", ALLOW)
+    assert result.status == 200
+    assert b"If-None-Match: \n" in result.data
+    assert b"If-Modified-Since: \n" in result.data
+
+
+def test_validators_reported_from_response(server):
+    result = fetch_url(f"{server}/etagged", ALLOW)
+    assert result.status == 200
+    assert result.etag == '"act-1"'
+    assert result.last_modified == ""
+
+
+def test_304_returns_not_modified(server):
+    first = fetch_url(f"{server}/etagged", ALLOW)
+    assert first.data  # sanity: first read carries the body
+    second = fetch_url(f"{server}/etagged", ALLOW, etag=first.etag)
+    assert second.status == 304
+    assert second.not_modified is True
+    assert second.data == b""
+
+
+def test_last_modified_validator_304(server):
+    first = fetch_url(f"{server}/lastmod", ALLOW)
+    assert first.last_modified == "Wed, 21 Oct 2015 07:28:00 GMT"
+    second = fetch_url(f"{server}/lastmod", ALLOW,
+                       last_modified=first.last_modified)
+    assert second.status == 304
+    assert second.not_modified is True
 
 
 def test_rate_limiter_throttles():

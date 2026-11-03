@@ -54,7 +54,8 @@ def layout(title: str, body: str) -> str:
         f"<header><h1>{APP_TITLE}</h1><nav>"
         "<a href=\"/\">Dashboard</a><a href=\"/changes\">Changes</a>"
         "<a href=\"/feed.xml\">Feed</a>"
-        "<a href=\"/search\">Search</a><a href=\"/sources\">Sources</a>"
+        "<a href=\"/search\">Search</a>"
+        "<a href=\"/documents\">Documents</a><a href=\"/sources\">Sources</a>"
         "<a href=\"/review\">Review</a><a href=\"/status\">Status</a>"
         "<a href=\"/coverage\">Coverage</a>"
         "<a href=\"/limitations\">Limitations</a>"
@@ -342,10 +343,51 @@ def document_page(document: dict, versions: list[dict],
         + "<h3>Reports</h3><ul>" + reports_html + "</ul>")
 
 
-def search_page(query: str, results: list[dict], doc_lookup) -> str:
+def _filter_selects(filters: dict, options: dict) -> str:
+    def _select(name: str) -> str:
+        current = filters.get(name, "")
+        values = options.get(name, [])
+        items = ["<option value=\"\">all</option>"] + [
+            f"<option value=\"{esc(v)}\"{' selected' if v == current else ''}>"
+            f"{esc(v)}</option>" for v in values]
+        return (f"<label>{esc(name)} <select name=\"{esc(name)}\">"
+                + "".join(items) + "</select></label> ")
+
+    return _select("source") + _select("type") + _select("jurisdiction")
+
+
+def documents_page(documents: list[dict], filters: dict,
+                   options: dict) -> str:
+    form = ("<form method=\"get\" action=\"/documents\">"
+            + _filter_selects(filters, options)
+            + "<button type=\"submit\">Filter</button></form>")
+    active = " ".join(
+        f"{name}={value}" for name, value in filters.items() if value)
+    rows = "".join(
+        f"<tr><td><a href=\"/documents/{d['id']}\">{esc(d['title'])}</a></td>"
+        f"<td>{esc(d['source_id'])}</td>"
+        f"<td>{esc(d['document_type'])}</td>"
+        f"<td>{esc(d['jurisdiction'])}</td>"
+        f"<td>{esc(str(d['versions']))}</td>"
+        f"<td>{esc(d['updated_at'])}</td></tr>"
+        for d in documents)
+    table = ("<table><tr><th>Document</th><th>Source</th><th>Type</th>"
+             "<th>Jurisdiction</th><th>Versions</th><th>Updated</th></tr>"
+             + rows + "</table>" if documents
+             else "<p>No documents match these filters.</p>")
+    label = f" (filters: {esc(active)})" if active else ""
+    return (form + f"<p>{len(documents)} document(s){label}.</p>" + table)
+
+
+def search_page(query: str, results: list[dict], doc_lookup,
+                filters: dict | None = None,
+                options: dict | None = None) -> str:
+    filters = filters or {}
+    options = options or {}
     form = (f"<form method=\"get\" action=\"/search\">"
             f"<input name=\"q\" value=\"{esc(query)}\" size=\"40\"> "
-            "<button type=\"submit\">Search</button></form>")
+            + _filter_selects(filters, options)
+            + "<button type=\"submit\">Search</button></form>")
     if not query:
         return form + "<p>Search titles and extracted legal text.</p>"
     items = "".join(

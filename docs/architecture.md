@@ -155,3 +155,10 @@ CLI (argparse) → config.py → logging_config.py → local data dir + sqlite
   LIKE fallback ANDs the same predicates onto its match, and LIMIT is
   applied after filtering so counts stay truthful. The web change feed
   already used `list_reports_filtered`; nothing in its behaviour changed.
+- M19 adds: the missing middle of the web UI - `/documents` (a filtered
+  table over `list_documents` with per-document links) and filter
+  selects on `/search` that flow into `search_fts.search`. Dropdown
+  options are computed with `SELECT DISTINCT` on fixed column names;
+  user-supplied values are always bound parameters and escaped on the
+  way out. The CLI and the web now filter through the same store
+  functions, so a filter cannot behave differently in the two surfaces.

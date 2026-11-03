@@ -1,4 +1,4 @@
-"""Command-line interface for India Law Radar (Milestone 18).
+"""Command-line interface for India Law Radar (Milestone 19).
 
 Implemented commands (all functional, no placeholders):
   lawradar init              — create data dir, local settings.yaml, migrate db
@@ -331,7 +331,7 @@ def cmd_init(args: argparse.Namespace) -> int:
     return 0
 
 
-APP_LABEL = f"India Law Radar v{__version__} (Milestone 18)"
+APP_LABEL = f"India Law Radar v{__version__} (Milestone 19)"
 
 
 def _sqlite_path(db_url: str, data_dir: Path) -> Path | None:

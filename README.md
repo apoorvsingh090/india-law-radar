@@ -5,16 +5,17 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
 Source-verifiable monitoring of official Indian legal documents.
-**Milestone 18 (this release):** filters on the CLI listing and search
-commands - `documents list` and `documents search` accept
-`--source`/`--type`/`--jurisdiction`, and `reports list` accepts
-`--type`/`--status`/`--since YYYY-MM-DD` (UTC; bad dates exit 2).
-Filtering happens in SQL, so result counts and limits stay accurate,
-and `--json` returns only the matching rows. Builds on M17 durable
-SQLite connections, M16 the browser status page, M15 shareable briefs,
-M14 operator status, M13 conditional polling, M12 evidence bundles,
-M11 webhook notifications, M10 verifiable backups, M9 source health,
-the M8 radar loop, and `docs/pilot.md`. Still zero paid dependencies.
+**Milestone 19 (this release):** web browsing parity - a new
+`/documents` page lists every stored document (title, source, type,
+jurisdiction, version count, last update) with server-side
+`source`/`type`/`jurisdiction` filters and links to each document page,
+and `/search` gains the same filter selects, passing them into both
+search engines. All filtering is SQL-side and every filter value is
+escaped in the form. Builds on M18 CLI filters, M17 durable SQLite
+connections, M16 the status page, M15 shareable briefs, M14 operator
+status, M13 conditional polling, M12 evidence bundles, M11 webhook
+notifications, M10 verifiable backups, M9 source health, the M8 radar
+loop, and `docs/pilot.md`. Still zero paid dependencies.
 
 > Scope honesty: this MVP does **not** claim complete coverage of Indian law,
 > is not a substitute for a qualified advocate, and every future change report
@@ -53,7 +54,7 @@ lawradar serve
 Expected: `lawradar health` prints `health: OK` with three PASS lines;
 `pytest` passes (unit + integration).
 
-## CLI (Milestone 18)
+## CLI (Milestone 19)
 
 ```text
 lawradar init [--force]        dirs + config + migrate sqlite schema
@@ -205,7 +206,8 @@ data/          local-only runtime data (git-ignored except README/.gitkeep)
 - M15: shareable Markdown briefs (`reports brief`, `/reports/<id>/brief.md`) (done)
 - M16: browser status page (`/status`) + dashboard attention badge (done)
 - M17: WAL + busy-timeout durable SQLite connections (done)
-- M18: CLI list/search filters for documents and reports (done here)
+- M18: CLI list/search filters for documents and reports (done)
+- M19: web documents browser + filtered search (done here)
 
 ## Safeguards
 

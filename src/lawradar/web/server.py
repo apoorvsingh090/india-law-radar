@@ -102,7 +102,11 @@ class Handler(BaseHTTPRequestHandler):
                 elif path == "/changes":
                     self._changes(conn, query)
                 elif path == "/search":
-                    self._search(conn, query.get("q", [""])[0])
+                    self._search(conn, query.get("q", [""])[0], {
+                        name: query.get(name, [""])[0]
+                        for name in ("source", "type", "jurisdiction")})
+                elif path == "/documents":
+                    self._documents_page(conn, query)
                 elif path == "/sources":
                     rows = with_health(
                         [dict(r) for r in store.list_sources(conn)])
@@ -337,9 +341,15 @@ class Handler(BaseHTTPRequestHandler):
         self._page(document["title"],
                    pages.document_page(dict(document), versions, reports))
 
-    def _search(self, conn, query_text: str) -> None:
+    def _search(self, conn, query_text: str, filters: dict | None = None
+                ) -> None:
+        filters = filters or {}
         search_fts.ensure_indexed(conn)
-        results = search_fts.search(conn, query_text) if query_text else []
+        results = (search_fts.search(
+            conn, query_text, source=filters.get("source") or None,
+            doc_type=filters.get("type") or None,
+            jurisdiction=filters.get("jurisdiction") or None)
+            if query_text else [])
 
         def _official(doc_id: int) -> str:
             document = store.get_document(conn, doc_id)
@@ -347,7 +357,30 @@ class Handler(BaseHTTPRequestHandler):
 
         for result in results:
             result["doc_id"] = result.pop("id")
-        self._page("Search", pages.search_page(query_text, results, _official))
+        self._page("Search", pages.search_page(
+            query_text, results, _official, filters, self._doc_options(conn)))
+
+    def _doc_options(self, conn) -> dict:
+        def _distinct(column: str) -> list[str]:
+            return [str(row[0]) for row in conn.execute(
+                f"SELECT DISTINCT {column} FROM documents "
+                f"WHERE {column} != '' ORDER BY {column}")]
+
+        return {
+            "source": _distinct("source_id"),
+            "type": _distinct("document_type"),
+            "jurisdiction": _distinct("jurisdiction"),
+        }
+
+    def _documents_page(self, conn, query: dict) -> None:
+        filters = {name: query.get(name, [""])[0]
+                   for name in ("source", "type", "jurisdiction")}
+        rows = [dict(r) for r in store.list_documents(
+            conn, limit=200, source=filters["source"] or None,
+            doc_type=filters["type"] or None,
+            jurisdiction=filters["jurisdiction"] or None)]
+        self._page("Documents", pages.documents_page(
+            rows, filters, self._doc_options(conn)))
 
     def _coverage(self, conn) -> None:
         sources = [dict(r) for r in store.list_sources(conn)]

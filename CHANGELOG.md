@@ -5,6 +5,21 @@ All notable changes to India Law Radar will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.19.0] - 2026-11-03
+
+### Added
+
+- Milestone 19 (web browsing parity): `GET /documents` lists stored
+  documents (title, source, type, jurisdiction, version count, last
+  update) with `source`/`type`/`jurisdiction` filters and links to each
+  document page; a `Documents` nav link exposes it
+- `GET /search` gains the same filter selects and passes them into the
+  FTS and LIKE search paths, so web results match `documents search`
+  filters exactly
+- Filter dropdown options come from `SELECT DISTINCT` over the local
+  database; every value is HTML-escaped and filtering is parameterised
+  SQL
+
 ## [0.18.0] - 2026-11-03
 
 ### Added

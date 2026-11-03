@@ -1,8 +1,9 @@
-"""Command-line interface for India Law Radar (Milestone 13).
+"""Command-line interface for India Law Radar (Milestone 14).
 
 Implemented commands (all functional, no placeholders):
   lawradar init              — create data dir, local settings.yaml, migrate db
   lawradar health            — verify config loads, data dir writable, sqlite works
+  lawradar status            — operator snapshot (sources, queue, exports, backups)
   lawradar sources list      — show registry (DB-synced) with check timestamps
   lawradar ingest <id>       — ingest one source (fixture / manual --file / http probe)
   lawradar ingest --all      — ingest all enabled sources
@@ -68,6 +69,9 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Exit non-zero if any check reports a warning",
     )
+
+    sub.add_parser(
+        "status", help="Operator snapshot (sources, queue, exports, backups)")
 
     p_sources = sub.add_parser("sources", help="Inspect the source registry")
     sources_sub = p_sources.add_subparsers(dest="sources_command", required=True)
@@ -303,7 +307,7 @@ def cmd_init(args: argparse.Namespace) -> int:
     return 0
 
 
-APP_LABEL = f"India Law Radar v{__version__} (Milestone 13)"
+APP_LABEL = f"India Law Radar v{__version__} (Milestone 14)"
 
 
 def _sqlite_path(db_url: str, data_dir: Path) -> Path | None:
@@ -422,6 +426,29 @@ def cmd_health(args: argparse.Namespace) -> int:
         return 1
     if has_warning and args.fail_on_warning:
         return 2
+    return 0
+
+
+def cmd_status(args: argparse.Namespace) -> int:
+    from lawradar.db import store
+    from lawradar.ingestion.pipeline import _db_path
+    from lawradar.status import collect_status, format_status
+
+    config = _effective_config(args)
+    setup_logging(config.log_level, config.log_file)
+    db_path = _db_path(config)
+    if not db_path.exists():
+        print("no database yet - run `lawradar init` first", file=sys.stderr)
+        return 1
+    conn = store.connect(db_path)
+    try:
+        snapshot = collect_status(conn, config)
+    finally:
+        conn.close()
+    if args.json:
+        print(json.dumps(snapshot, indent=2, default=str))
+    else:
+        print(format_status(snapshot))
     return 0
 
 
@@ -1135,6 +1162,8 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_init(args)
     if args.command == "health":
         return cmd_health(args)
+    if args.command == "status":
+        return cmd_status(args)
     if args.command == "sources":
         return cmd_sources(args)
     if args.command == "ingest":

@@ -51,7 +51,7 @@ def test_parser_has_only_implemented_commands():
     parser = build_parser()
     actions = [a for a in parser._subparsers._group_actions]
     commands = set(actions[0].choices) if actions else set()
-    assert commands == {"init", "health", "sources", "ingest", "watch",
+    assert commands == {"init", "health", "status", "sources", "ingest", "watch",
                         "documents", "reports", "review", "notify", "bundles",
                         "serve", "eval", "feedback", "backup"}
 

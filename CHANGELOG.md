@@ -5,6 +5,26 @@ All notable changes to India Law Radar will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.14.0] - 2026-11-03
+
+### Added
+
+- Milestone 14 (operator status): `lawradar status` prints a one-screen
+  snapshot derived from local state only - source health counts
+  (ok/stale/failing + disabled/manual/retired), documents and versions,
+  reports by review status, approved reports with no evidence bundle,
+  webhook enablement and failed attempts, the newest backup (plus
+  sidecar presence), and the last ingestion run
+- An `attention` list names each actionable item (failing/stale source,
+  pending reviews, failed webhook attempts, approved reports without an
+  evidence bundle, and a database whose schema is behind the shipped
+  migrations)
+- `lawradar status --json` and `GET /api/status` serve the same snapshot
+  for scripts and dashboards; the command is read-only, exits 0, and
+  exits 1 only when the database does not exist yet
+- `store.applied_migrations()` exposes the applied migration names
+  read-only (used by the snapshot)
+
 ## [0.13.0] - 2026-11-03
 
 ### Added

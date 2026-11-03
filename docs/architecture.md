@@ -111,3 +111,12 @@ CLI (argparse) → config.py → logging_config.py → local data dir + sqlite
   validators from `200` responses replace the cached ones after the
   version is stored; servers that ignore validators behave exactly as
   before.
+- M14 adds: `status.py` - a read-only operator snapshot composed from
+  existing tables (source health, documents, reports, review queue,
+  bundles, notification attempts, ingestion runs) plus filesystem facts
+  (DB size, newest backup, checksum sidecar presence). It never touches
+  the network and never writes. The same dict feeds `lawradar status`,
+  `--json`, and `GET /api/status`, and an `attention` list turns the
+  numbers into concrete next commands. Exit codes stay with `health`
+  (setup) and `sources health` (sweeps) so the snapshot adds visibility
+  without changing alerting semantics.

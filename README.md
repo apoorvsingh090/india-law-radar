@@ -5,19 +5,19 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
 Source-verifiable monitoring of official Indian legal documents.
-**Milestone 13 (this release):** polite conditional polling - every
-`http_poll` document is re-checked with `If-None-Match` /
-`If-Modified-Since` using validators cached from the previous sweep
-(migration `008`). When the official source answers `304 Not Modified`
-nothing is downloaded, no version is created, the run stays green, and
-the source's last-validated time is refreshed; `ingest`/`watch` report
-it as `unchanged`. New `ETag`/`Last-Modified` values are stored on each
-changed response, so a real edit still produces a version, a diff, and
-a change report. Builds on M12 evidence bundles (`lawradar bundles
-create` / `verify`), M11 webhook notifications, M10 verifiable backups,
-M9 source health (`lawradar sources health`, stale/failing sweeps exit
-1), the M8 radar loop (`lawradar watch`, Atom feed of **approved**
-reports), and `docs/pilot.md`. Still zero paid dependencies.
+**Milestone 14 (this release):** an operator snapshot - `lawradar status`
+answers "is this deployment healthy and what needs a human right now?"
+from local state only: source health (ok/stale/failing, disabled/manual/
+retired), document and version counts, report queue and review status,
+approved reports without an evidence bundle, failed webhook attempts,
+the newest backup (with sidecar presence), and the last ingestion run.
+`--json` and `GET /api/status` expose the same snapshot for dashboards
+and schedulers; an `attention` list names each actionable item.
+Builds on M13 conditional polling (cached `ETag`/`Last-Modified`,
+`304` = unchanged), M12 evidence bundles, M11 webhook notifications,
+M10 verifiable backups, M9 source health, the M8 radar loop
+(`lawradar watch`, Atom feed of **approved** reports), and
+`docs/pilot.md`. Still zero paid dependencies.
 
 > Scope honesty: this MVP does **not** claim complete coverage of Indian law,
 > is not a substitute for a qualified advocate, and every future change report
@@ -56,11 +56,13 @@ lawradar serve
 Expected: `lawradar health` prints `health: OK` with three PASS lines;
 `pytest` passes (unit + integration).
 
-## CLI (Milestone 13)
+## CLI (Milestone 14)
 
 ```text
 lawradar init [--force]        dirs + config + migrate sqlite schema
 lawradar health [--json]       config + data-dir + sqlite checks (no network)
+lawradar status [--json]       operator snapshot: sources, queue, exports,
+                               backup, last run + an attention list
 lawradar sources list          registry with check timestamps
 lawradar sources health        ok/due/stale/failing per source
                                (exit 1 if a monitored source is stale or failing)
@@ -130,6 +132,16 @@ documents show <id>` prints the cached validators, and `ingest` /
 `watch` summaries include an `unchanged` counter. Servers that ignore
 validators simply return `200` and behave exactly as before.
 
+Operator snapshot (M14): `lawradar status` prints one screen of local
+state - monitored sources by health, document/version counts, reports
+by review status, approved reports without an evidence bundle, failed
+webhook attempts, the newest backup and whether its checksum sidecar is
+present, and the last ingestion run - followed by an `attention` list
+(a behind-schema database flags its pending migrations there).
+`--json` and `GET /api/status` serve the same snapshot. It is read-only
+and exits 0 (1 only when no database exists yet); use `lawradar health`
+for start-up gating and `lawradar sources health` for sweep alerting.
+
 Try without network: `lawradar ingest fixture-sample --sources-file
 config/sources.example.yaml` twice — the second run reports `changed=0`
 (idempotent dedup). All fixture titles carry a `[FIXTURE]` marker and
@@ -173,7 +185,8 @@ data/          local-only runtime data (git-ignored except README/.gitkeep)
 - M10: verifiable SQLite backups, restore with safety snapshot (done)
 - M11: outbound webhook notifications of approved reports (done)
 - M12: offline-verifiable evidence bundle exports (done)
-- M13: conditional HTTP polling with cached validators (done here)
+- M13: conditional HTTP polling with cached validators (done)
+- M14: operator status snapshot (`lawradar status`, `/api/status`) (done here)
 
 ## Safeguards
 

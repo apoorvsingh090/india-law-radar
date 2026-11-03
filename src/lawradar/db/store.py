@@ -32,6 +32,18 @@ def _applied(conn: sqlite3.Connection) -> set[str]:
     return {row["name"] for row in conn.execute("SELECT name FROM _migrations")}
 
 
+def applied_migrations(conn: sqlite3.Connection) -> list[str]:
+    """Names of migrations already applied to this database (read-only)."""
+    return sorted(_applied(conn))
+
+
+def pending_migrations(conn: sqlite3.Connection) -> list[str]:
+    """Names of shipped migrations this database has not applied."""
+    done = _applied(conn)
+    return [path.name for path in sorted(MIGRATIONS_DIR.glob("*.sql"))
+            if path.name not in done]
+
+
 def apply_migrations(conn: sqlite3.Connection) -> list[str]:
     """Apply pending ``migrations/*.sql`` in filename order. Returns applied."""
     done = _applied(conn)

@@ -1,4 +1,4 @@
-# Limitations (public disclosure — Milestone 13)
+# Limitations (public disclosure — Milestone 14)
 
 - Coverage: only the sources shown on `/sources` that are actually ingested.
   The pilot set is small (see `docs/coverage.md`); no completeness claim is made.
@@ -39,6 +39,12 @@
   probed URL, so a redirect change starts an unconditional fetch again.
   A `304` proves reachability and no-change per HTTP, not legal
   non-amendment.
+- Operator status: `lawradar status` reports what the local database
+  knows. A green snapshot means "nothing local needs attention", not
+  "coverage is complete" - a source that was never ingested cannot look
+  stale, and pending-review counts say nothing about review quality.
+  Never ingested sources and silent failures outside the DB are still
+  only visible through `lawradar sources list` / logs.
 - Backups: `lawradar backup create` snapshots the SQLite DB, not raw/text
   corpora, config, or secrets. Snapshots are unencrypted and only as good
   as their off-host copy; a `.db` without its checksum/manifest sidecars is

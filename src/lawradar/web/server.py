@@ -16,6 +16,8 @@ import re
 import time
 import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
+from types import SimpleNamespace
 
 from lawradar import __version__
 from lawradar.db import store
@@ -150,6 +152,18 @@ class Handler(BaseHTTPRequestHandler):
                             store.list_published_reports(conn, limit=50)]
                     self._send(200, feeds.atom_feed(rows),
                                "application/atom+xml; charset=utf-8")
+                elif path == "/api/status":
+                    from lawradar.status import collect_status
+
+                    config = self.server.config
+                    if config is None:
+                        config = SimpleNamespace(
+                            db_url=f"sqlite:///{self.server.db_path}",
+                            data_dir=str(Path(self.server.db_path).parent),
+                            notify_enabled=False,
+                            notify_webhooks=[],
+                        )
+                    self._json(collect_status(conn, config))
                 elif path == "/api/sources/health":
                     items = evaluate_sources(
                         [dict(r) for r in store.list_sources(conn)])

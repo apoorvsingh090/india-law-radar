@@ -55,7 +55,13 @@ Out of scope:
   about validators. `304` handling never bypasses the allowlist,
   TLS verification, size caps, or rate limits; validators are capped in
   length and stored as opaque strings.
+- The operator snapshot (M14, `lawradar status` / `GET /api/status`)
+  exposes counts, health states, and local filesystem paths (database,
+  newest backup), never document content, review notes, feedback text,
+  webhook secrets, or tokens. It follows the server's normal exposure
+  model: loopback by default, a shared-secret token required for
+  non-loopback binds; `/api/status` is read-only.
 
 ## Supported versions
 
-Only the latest code on `main` (currently `0.13.0`) is supported.
+Only the latest code on `main` (currently `0.14.0`) is supported.

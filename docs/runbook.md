@@ -10,6 +10,8 @@
 - `lawradar notify list` — webhook delivery attempts (audit/triage);
   `/api/notifications` serves the same rows as JSON, and report pages
   show the per-target history
+- `lawradar bundles list` — what evidence was exported, when, and its
+  checksum; `/api/bundles` serves the same rows as JSON
 - `lawradar backup verify <file>` - newest snapshot trust check; see
   `docs/backup.md` for the restore drill
 - Dashboard `/` — ingestion failures + coverage warnings section
@@ -34,6 +36,10 @@
 | `/feed.xml` missing an expected report | report not approved yet | `review --list`, then `--approve` with notes — the feed only ever lists published reports |
 | report page shows a `failed` notification; dashboard shows failed outbound deliveries | webhook target refused (HTTP 4xx/5xx, DNS, timeout) | Check the target URL/secret in settings, fix the receiver, then `lawradar notify send` (idempotent; delivered targets are skipped). Exit 1 means some target still failed |
 | `notify send` exits 2 | notifications disabled or target config invalid | Set `notify_enabled: true` + valid `notify_webhooks` in settings (http/https URLs, unique target names); nothing was sent in that case |
+| `bundles create` exits 2 (`not approved yet`) | the report is still a draft | Approve it first via `lawradar review --approve` with notes; drafts are never exportable evidence |
+| `bundles create` -> `hash mismatch` for the version | stored raw file no longer matches `content_sha256` | Do NOT export or share this bundle. Treat the raw store as suspect: run `lawradar backup verify` on a recent snapshot, investigate both, re-ingest the document if it was tampered after download |
+| `bundles verify` -> `manifest hash mismatch` / missing or unexpected member | the zip changed after export (partial copy or tampering) | Do not cite it as evidence. Re-copy from the trusted source, or re-export with `lawradar bundles create` and compare checksums against `bundles list` |
+| `bundles list` shows no rows for an old export | export predates migration `007` or the audit row was lost | The zip may still be valid - run `lawradar bundles verify PATH` on the artifact itself; verification never depends on the DB |
 | `sources health` → `FAILED` (`stale`) | no successful sweep within `2 x poll_interval` (min 15m) | Check the scheduler/watch log, then `lawradar ingest <id>` once. If it succeeds, health clears; if not, apply the matching error row above |
 | `sources health` → `failing` | the most recent check recorded `last_error` | Fix the cause, re-run `lawradar ingest <id>` (or wait for the next sweep) — success clears the error |
 | `sources health` ignores a source | `manual`, `disabled`, or `retired` | By design: only enabled automated sources affect the exit code. Manual files still need `lawradar ingest <id> --file PATH`; retired means the id was removed from the registry (history is kept, alerts stop) |
@@ -57,6 +63,9 @@ lawradar reports generate
 lawradar reports verify <report-id>
 # Retry outstanding webhook deliveries (idempotent; exit 1 = still failing)
 lawradar notify send
+# Export + verify evidence for one approved report (safe to repeat)
+lawradar bundles create <report-id>
+lawradar bundles verify data\bundles\lawradar-evidence-r<id>-<UTC>.zip
 # Bounded regression after any pipeline change
 lawradar eval            # expect 7/7; exit 1 otherwise
 pytest                   # full suite

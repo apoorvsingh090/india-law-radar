@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "india-law-radar"
-version = "0.11.0"
+version = "0.12.0"
 description = "India Law Radar: source-verifiable monitoring of official Indian legal documents (MVP)"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -28,3 +28,4 @@ where = ["src"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"
+

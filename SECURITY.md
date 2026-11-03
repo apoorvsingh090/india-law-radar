@@ -46,7 +46,11 @@ Out of scope:
 - Backup checksums are unkeyed: they detect corruption and partial copies,
   not an attacker who can rewrite the DB and sidecars. Protect the backup
   directory with filesystem permissions and keep off-host copies.
+- Evidence bundle manifests (M12) are unkeyed the same way: they are
+  content-addressed evidence, not an anti-tamper seal. Verify with
+  `lawradar bundles verify` and compare against the `evidence_bundles`
+  audit table on the exporting machine.
 
 ## Supported versions
 
-Only the latest code on `main` (currently `0.11.0`) is supported.
+Only the latest code on `main` (currently `0.12.0`) is supported.

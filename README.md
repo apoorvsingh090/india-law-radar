@@ -5,15 +5,18 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
 Source-verifiable monitoring of official Indian legal documents.
-**Milestone 11 (this release):** outbound notifications - once a human
-approval commits, the approved report is POSTed as a signed JSON payload
-to explicitly configured webhook targets (stdlib `urllib`, no new
-dependencies). Delivery is **at most once per (report, webhook)**,
-failures never block or roll back the approval, and `lawradar notify
-list` / `notify send` audit and retry. Builds on M10 verifiable backups,
-M9 source health (`lawradar sources health`, stale/failing sweeps exit 1),
-the M8 radar loop (`lawradar watch`, Atom feed of **approved** reports),
-and `docs/pilot.md`. Still zero paid dependencies.
+**Milestone 12 (this release):** portable evidence bundles - `lawradar
+bundles create <report-id>` exports one approved report as a single
+ZIP archive (report record with citations and review history, the
+deterministic diff, and the original document bytes when stored)
+with a manifest that hashes every member; `lawradar bundles verify`
+fails closed on any tampering. Exports are refused for unpublished
+drafts and when the stored original no longer matches its SHA-256.
+Builds on M11 webhook notifications (`notify list` / `notify send`),
+M10 verifiable backups, M9 source health (`lawradar sources health`,
+stale/failing sweeps exit 1), the M8 radar loop (`lawradar watch`,
+Atom feed of **approved** reports), and `docs/pilot.md`. Still zero
+paid dependencies.
 
 > Scope honesty: this MVP does **not** claim complete coverage of Indian law,
 > is not a substitute for a qualified advocate, and every future change report
@@ -52,7 +55,7 @@ lawradar serve
 Expected: `lawradar health` prints `health: OK` with three PASS lines;
 `pytest` passes (unit + integration).
 
-## CLI (Milestone 11)
+## CLI (Milestone 12)
 
 ```text
 lawradar init [--force]        dirs + config + migrate sqlite schema
@@ -78,6 +81,9 @@ lawradar review --list        pending human-review queue
 lawradar review <id> --approve|--reject|--changes --reviewer R --notes "…"
 lawradar notify list [--report ID] [--status S]   webhook attempts (audit/triage)
 lawradar notify send [--report ID] [--limit N]    deliver pending targets (exit 1 on failure)
+lawradar bundles create <id> [--out DIR]   export an approved report as evidence zip
+lawradar bundles verify PATH    fail-closed offline verification of a bundle
+lawradar bundles list [--report ID]   export history (audit table)
 lawradar serve [--host 127.0.0.1] [--port 8080] [--token ...]
 lawradar eval                  curated pilot evaluation set (expect 7/7)
 lawradar feedback list         triage user error reports
@@ -101,6 +107,18 @@ verify. HTTP 4xx/5xx, DNS, and timeout failures are recorded as
 `failed` attempts (visible on the report page and via `notify list`);
 publication is never rolled back and nothing is auto-retried.
 
+Evidence bundles (M12): for anything already approved,
+`lawradar bundles create <report-id>` writes a deterministic
+`data/bundles/lawradar-evidence-r<id>-<UTC>.zip` containing
+`report.json` (summary, claims, citations, review history, document
+provenance, version hashes), `diff.txt`, and the original document as
+`document.bin` with a `sha256` sidecar. `manifest.json` lists the
+SHA-256 and byte size of every member; `lawradar bundles verify PATH`
+recomputes all of them offline and refuses anything else (unknown
+members, missing members, hash drift, wrong sidecar), mirroring the
+M10 backup semantics. Every export is recorded in the
+`evidence_bundles` audit table and shown on the report page.
+
 Try without network: `lawradar ingest fixture-sample --sources-file
 config/sources.example.yaml` twice — the second run reports `changed=0`
 (idempotent dedup). All fixture titles carry a `[FIXTURE]` marker and
@@ -116,13 +134,15 @@ and `.env.example`.
 ```text
 config/        example YAML (local settings.yaml is git-ignored)
 docs/          architecture, data-model, source-policy, evaluation, limitations,
-               pilot runbook (real-source operation, M8-10), backup/restore (M10)
+               pilot runbook (real-source operation, M8-10), backup/restore
+               (M10), evidence bundles in the runbook (M12)
 src/lawradar/  cli, config, logging, db/store + db/backup, sources/*,
                ingestion/* (watch, health), extraction/*, diffing/*,
                reporting/*, review/*, ai/*, notify/dispatch (webhooks),
-               search/fts, web/* (incl. Atom feed), evaluation/*
-migrations/    001-006 (schema, ai_attempts, FTS index, feedback, retirement,
-               notifications)
+               evidence/* (bundles), search/fts, web/* (incl. Atom feed),
+               evaluation/*
+migrations/    001-007 (schema, ai_attempts, FTS index, feedback, retirement,
+               notifications, bundles)
 tests/         unit + integration + fixtures + evaluation notes
 scripts/       operator helpers (probe script; daily pilot loop is CLI-only)
 data/          local-only runtime data (git-ignored except README/.gitkeep)
@@ -140,7 +160,8 @@ data/          local-only runtime data (git-ignored except README/.gitkeep)
 - M8: watch sweeps, Atom feed of approved reports, pilot runbook (done)
 - M9: source health/staleness, dashboard + API signals, scheduler exit code (done)
 - M10: verifiable SQLite backups, restore with safety snapshot (done)
-- M11: outbound webhook notifications of approved reports (done here)
+- M11: outbound webhook notifications of approved reports (done)
+- M12: offline-verifiable evidence bundle exports (done here)
 
 ## Safeguards
 

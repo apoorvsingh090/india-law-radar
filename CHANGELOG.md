@@ -5,6 +5,36 @@ All notable changes to India Law Radar will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.12.0] - 2026-11-03
+
+### Added
+
+- Milestone 12 (evidence bundles): `lawradar bundles create <report-id>`
+  exports one approved change report as a single deterministic ZIP
+  (`data/bundles/lawradar-evidence-r<id>-<UTC>.zip`) containing
+  `report.json` (summary, claims, citations, review history, document
+  provenance, version hashes), `diff.txt`, and - when the store keeps
+  them - the original document bytes as `document.bin` plus a
+  `document.bin.sha256` sidecar
+- `manifest.json` lives inside the bundle and lists the SHA-256 and
+  byte size of every other member; `lawradar bundles verify PATH`
+  re-verifies offline and fails closed on missing members, unexpected
+  members, any hash/size drift, wrong sidecars, or an unparsable
+  manifest
+- Export policy: drafts (not yet published/approved) are refused
+  (exit 2), unknown report ids exit 1, and a stored original whose hash
+  no longer matches the version's `content_sha256` blocks the export
+  instead of amplifying corrupt data
+- Every export is recorded in the new `evidence_bundles` audit table
+  (migration `007`) with a unique per-report path and shown on the
+  report page; `/api/bundles` exposes the history as JSON
+- `lawradar bundles list` (per-report filter, `--json` supported)
+- `lawradar health` now includes a `notify_config` check: a disabled
+  setup passes, an enabled setup with no targets warns, and invalid
+  webhook target config fails (closes the M11 loose end)
+- `evidence/bundle.py` (stdlib only) with unit + real-CLI integration
+  tests (roundtrip, tampering matrix, refusal paths, determinism)
+
 ## [0.11.0] - 2026-11-03
 
 ### Added

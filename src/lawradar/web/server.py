@@ -133,6 +133,16 @@ class Handler(BaseHTTPRequestHandler):
                                 store.list_notification_attempts(
                                     conn, change_report_id=report or None,
                                     limit=100)])
+                elif path == "/api/bundles":
+                    try:
+                        report = int(query.get("report", [""])[0])
+                    except ValueError:
+                        self._json({"error": "report must be an integer"},
+                                   400)
+                        return
+                    self._json([dict(r) for r in
+                                store.list_evidence_bundles(
+                                    conn, report or None, limit=100)])
                 elif path == "/feed.xml":
                     # Published-only Atom feed (M8): the review gate, not
                     # ingestion, decides what appears here.
@@ -247,6 +257,8 @@ class Handler(BaseHTTPRequestHandler):
         notifications = [dict(n) for n in
                          store.list_notification_attempts(conn, report_id,
                                                           limit=20)]
+        bundles = [dict(b) for b in
+                   store.list_evidence_bundles(conn, report_id, limit=10)]
         from lawradar.review.queue import audit_trail
 
         self._page(f"Report {report_id}",
@@ -254,7 +266,7 @@ class Handler(BaseHTTPRequestHandler):
                                         versions, citations,
                                         audit_trail(conn, report_id),
                                         self._token_value(query),
-                                        notifications))
+                                        notifications, bundles))
 
     def _api_report(self, conn, report_id: int) -> None:
         report = store.get_report(conn, report_id)

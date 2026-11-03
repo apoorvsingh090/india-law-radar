@@ -633,6 +633,51 @@ def count_failed_attempts(conn: sqlite3.Connection, limit: int = 100) -> int:
     return int(row["c"])
 
 
+# -- evidence bundles (M12) ---------------------------------------------------
+
+def record_evidence_bundle(
+    conn: sqlite3.Connection,
+    *,
+    change_report_id: int | None,
+    path: str,
+    name: str,
+    sha256: str,
+    bytes: int,
+    has_document: bool,
+) -> int:
+    cursor = conn.execute(
+        """INSERT INTO evidence_bundles
+           (change_report_id, path, name, sha256, bytes, has_document)
+           VALUES (?, ?, ?, ?, ?, ?)""",
+        (change_report_id, path, name, sha256, bytes,
+         1 if has_document else 0),
+    )
+    return int(cursor.lastrowid)
+
+
+def list_evidence_bundles(
+    conn: sqlite3.Connection,
+    change_report_id: int | None = None,
+    limit: int = 50,
+) -> list[sqlite3.Row]:
+    clauses, params = [], []
+    if change_report_id is not None:
+        clauses.append("change_report_id=?")
+        params.append(change_report_id)
+    where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+    params.append(limit)
+    return list(conn.execute(
+        f"SELECT * FROM evidence_bundles {where} "
+        "ORDER BY id DESC LIMIT ?", params))
+
+
+def get_evidence_bundle(conn: sqlite3.Connection,
+                        bundle_id: int) -> sqlite3.Row | None:
+    return conn.execute(
+        "SELECT * FROM evidence_bundles WHERE id=?", (bundle_id,)
+    ).fetchone()
+
+
 # -- user feedback (M7) ------------------------------------------------------
 
 def add_feedback(

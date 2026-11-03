@@ -23,7 +23,8 @@ def test_health_json_shape(tmp_path, monkeypatch, capsys):
     assert rc == 0
     payload = json.loads(capsys.readouterr().out)
     assert payload["status"] == "ok"
-    assert {"config_loads", "data_dir_writable", "sqlite"} <= set(payload["checks"])
+    assert {"config_loads", "data_dir_writable", "sqlite",
+            "notify_config"} <= set(payload["checks"])
 
 
 def test_init_is_idempotent(tmp_path, monkeypatch):
@@ -51,8 +52,8 @@ def test_parser_has_only_implemented_commands():
     actions = [a for a in parser._subparsers._group_actions]
     commands = set(actions[0].choices) if actions else set()
     assert commands == {"init", "health", "sources", "ingest", "watch",
-                        "documents", "reports", "review", "notify", "serve",
-                        "eval", "feedback", "backup"}
+                        "documents", "reports", "review", "notify", "bundles",
+                        "serve", "eval", "feedback", "backup"}
 
 
 def test_sources_list_runs_in_isolated_dir(tmp_path, monkeypatch, capsys):

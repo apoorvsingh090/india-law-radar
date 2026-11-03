@@ -71,8 +71,8 @@ def test_create_writes_verified_snapshot_and_manifest(tmp_path):
         "sources": 1, "documents": 1, "versions": 1, "reports": 1,
         "published_reports": 1, "citations": 1, "review_tasks": 1, "runs": 1,
     }
-    assert len(info.migrations) == 6
-    assert info.migrations[-1] == "006_notifications.sql"
+    assert len(info.migrations) == 7
+    assert info.migrations[-1] == "007_bundles.sql"
     verified = backup.verify_backup(path)
     assert verified.sha256 == info.sha256
     assert verified.counts == info.counts

@@ -1,4 +1,4 @@
-"""Command-line interface for India Law Radar (Milestone 11).
+"""Command-line interface for India Law Radar (Milestone 12).
 
 Implemented commands (all functional, no placeholders):
   lawradar init              — create data dir, local settings.yaml, migrate db
@@ -19,6 +19,9 @@ Implemented commands (all functional, no placeholders):
   lawradar review <id> --approve|--reject|--changes --notes "..."
   lawradar notify list       — webhook delivery attempts (audit/triage)
   lawradar notify send       — deliver published reports to pending targets
+  lawradar bundles create <id> — export an approved report as evidence zip
+  lawradar bundles verify PATH — fail-closed offline verification of a bundle
+  lawradar bundles list      — export audit trail (all or per report)
   lawradar serve [--host 127.0.0.1] [--port 8080] [--token ...]
   lawradar eval                run the curated pilot evaluation set
   lawradar feedback list       triage user error reports
@@ -214,6 +217,26 @@ def build_parser() -> argparse.ArgumentParser:
     p_brestore.add_argument(
         "--force", action="store_true",
         help="Required when the target database already exists")
+
+    p_bundles = sub.add_parser(
+        "bundles", help="Offline-verifiable evidence exports (approved reports)")
+    bundles_sub = p_bundles.add_subparsers(
+        dest="bundles_command", required=True)
+    p_xcreate = bundles_sub.add_parser(
+        "create", help="Export one approved report as a verifiable bundle")
+    p_xcreate.add_argument("report_id", type=int)
+    p_xcreate.add_argument(
+        "--out", default=None,
+        help="Output directory (default: <data-dir>/bundles)")
+    p_xverify = bundles_sub.add_parser(
+        "verify", help="Read-only fail-closed verification of a bundle")
+    p_xverify.add_argument("bundle_path", help="Path to evidence bundle .zip")
+    p_xlist = bundles_sub.add_parser(
+        "list", help="Export history recorded in the audit table")
+    p_xlist.add_argument(
+        "--report", type=int, default=None,
+        help="Only bundles for this report id")
+    p_xlist.add_argument("--limit", type=int, default=50)
     return parser
 
 
@@ -280,7 +303,7 @@ def cmd_init(args: argparse.Namespace) -> int:
     return 0
 
 
-APP_LABEL = f"India Law Radar v{__version__} (Milestone 11)"
+APP_LABEL = f"India Law Radar v{__version__} (Milestone 12)"
 
 
 def _sqlite_path(db_url: str, data_dir: Path) -> Path | None:
@@ -347,6 +370,32 @@ def run_health_checks(config) -> dict:
                 conn.close()
     except Exception as exc:  # noqa: BLE001
         checks["sqlite"] = {"ok": False, "detail": str(exc)}
+    # 4. Notification target config (local-only, never networked).
+    try:
+        from lawradar.notify.dispatch import targets_from_config
+
+        targets = targets_from_config(config)
+        enabled = [t for t in targets if t.enabled]
+        if not getattr(config, "notify_enabled", False):
+            checks["notify_config"] = {
+                "ok": True,
+                "detail": "webhook notifications disabled",
+            }
+        elif not enabled:
+            checks["notify_config"] = {
+                "ok": True,
+                "warning": True,
+                "detail": "notifications enabled but no webhook targets "
+                          "configured",
+            }
+        else:
+            names = ", ".join(t.name for t in enabled)
+            checks["notify_config"] = {
+                "ok": True,
+                "detail": f"webhook targets: {names}",
+            }
+    except Exception as exc:  # noqa: BLE001
+        checks["notify_config"] = {"ok": False, "detail": str(exc)}
     return checks
 
 
@@ -998,6 +1047,79 @@ def cmd_backup(args: argparse.Namespace) -> int:
         return 1
 
 
+def cmd_bundles(args: argparse.Namespace) -> int:
+    from lawradar.db import store
+    from lawradar.evidence.bundle import (
+        BundleError,
+        BundleRefused,
+        create_bundle,
+        verify_bundle,
+    )
+    from lawradar.ingestion.pipeline import _db_path
+
+    try:
+        if args.bundles_command == "verify":
+            info = verify_bundle(args.bundle_path)
+            if args.json:
+                print(json.dumps(info.to_dict(), indent=2))
+            else:
+                print(f"bundle: OK {Path(info.path).name}")
+                print(f"  report_id: {info.report_id}")
+                print(f"  document: "
+                      f"{'included' if info.has_document else 'absent'}")
+                if info.has_document:
+                    print(f"  document_sha256: {info.document_sha256}")
+                print(f"  exported_at: {info.created_at}")
+                print(f"  bundle_sha256: {info.sha256}")
+            return 0
+        config = _effective_config(args)
+        setup_logging(config.log_level, config.log_file)
+        db_path = _db_path(config)
+        store.init_db(db_path)
+        conn = store.connect(db_path)
+        try:
+            if args.bundles_command == "create":
+                info = create_bundle(
+                    conn, args.report_id, args.out,
+                    data_dir=Path(config.data_dir))
+                if args.json:
+                    print(json.dumps(info.to_dict(), indent=2))
+                else:
+                    print(f"bundle: {info.path}")
+                    print(f"  report_id: {info.report_id}")
+                    print(f"  document: "
+                          f"{'included' if info.has_document else 'absent'}")
+                    if info.has_document:
+                        print(f"  document_sha256: {info.document_sha256}")
+                    print(f"  bytes: {info.bytes}")
+                    print(f"  bundle_sha256: {info.sha256}")
+                return 0
+            rows = store.list_evidence_bundles(
+                conn, args.report, limit=args.limit)
+            if args.json:
+                print(json.dumps([dict(r) for r in rows], indent=2,
+                                 default=str))
+            else:
+                if not rows:
+                    print("No bundles exported yet. Try `lawradar bundles "
+                          "create <report-id>`.")
+                for row in rows:
+                    doc = "doc included" if row["has_document"] else "no doc"
+                    print(f"[{row['id']}] report={row['change_report_id']} "
+                          f"{row['name']} ({doc}) "
+                          f"sha256={row['sha256'][:12]} "
+                          f"at={row['created_at']}")
+            return 0
+        finally:
+            conn.close()
+    except BundleRefused as exc:
+        print(f"bundle refused: {exc}", file=sys.stderr)
+        return 2
+    except (BundleError, OSError, sqlite3.Error) as exc:
+        print(f"bundle failed: {exc}", file=sys.stderr)
+        return 1
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
@@ -1027,6 +1149,8 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_notify(args)
     if args.command == "backup":
         return cmd_backup(args)
+    if args.command == "bundles":
+        return cmd_bundles(args)
     parser.error(f"unknown command: {args.command}")
     return 2
 

@@ -50,3 +50,9 @@ per outbound webhook attempt (`webhook` target name, `status` =
 unique index on `(change_report_id, webhook) WHERE status='delivered'`
 enforces at-most-once delivery; reports stay referenced with
 `ON DELETE SET NULL` so the audit trail survives report deletion.
+
+**Milestone 12 update:** `007` adds `evidence_bundles` - the export
+audit trail (path is unique so re-exports never overwrite, `sha256` and
+byte size of the artifact, `has_document` flag). `change_report_id` is
+`ON DELETE SET NULL` so history survives report deletion; the bundle
+ZIP itself stays verifiable offline via its embedded manifest.

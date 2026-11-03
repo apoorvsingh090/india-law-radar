@@ -139,7 +139,8 @@ def changes_feed(reports: list[dict], filters: dict,
 
 def report_detail(report: dict, document: dict, versions: list[dict],
                   citations: list[dict], trail: list[dict],
-                  token: str = "", notifications: list[dict] | None = None) -> str:
+                  token: str = "", notifications: list[dict] | None = None,
+                  bundles: list[dict] | None = None) -> str:
     claims = json.loads(report["claims_json"])
     affected = json.loads(report["affected_sections"])
     versions_html = "".join(
@@ -174,6 +175,25 @@ def report_detail(report: dict, document: dict, versions: list[dict],
         " Published reports are delivered at most once per target;"
         " <code>lawradar notify send</code> retries failed targets.</p>"
         if notifications else "")
+    bundle_rows = "".join(
+        f"<tr><td>[{esc(b['id'])}] {esc(b['name'])}</td>"
+        f"<td>{esc(b['sha256'][:12])}…</td>"
+        f"<td>{esc(str(b['bytes']))}</td>"
+        f"<td>{'yes' if b['has_document'] else 'no'}</td>"
+        f"<td>{esc(b['created_at'])}</td>"
+        f"<td><code>lawradar bundles verify {esc(b['name'])}</code></td></tr>"
+        for b in (bundles or []))
+    bundles_html = (
+        "<h3>Evidence bundles</h3>"
+        + ("<table><tr><th>Bundle</th><th>SHA-256</th><th>Bytes</th>"
+           "<th>Document</th><th>Exported</th><th>Verify</th></tr>"
+           + bundle_rows + "</table>")
+        + "<p class=\"badge\">Each export is a self-verifying"
+        " archive of this report (including the original document when"
+        " stored). Export one with"
+        " <code>lawradar bundles create "
+        f"{esc(str(report['id']))}</code>.</p>"
+        if bundles else "")
     token_field = (f"<input type=\"hidden\" name=\"token\" value=\"{esc(token)}\">"
                    if token else "")
     form = (
@@ -219,6 +239,7 @@ def report_detail(report: dict, document: dict, versions: list[dict],
         + "<h3>Audit diff</h3><pre>" + esc(report["diff_text"][:20000]) + "</pre>"
         + "<h3>Review history</h3><ul>" + trail_html + "</ul>"
         + notify_html
+        + bundles_html
         + "<h3>Human review</h3>" + form)
 
 

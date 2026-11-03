@@ -84,3 +84,17 @@ CLI (argparse) → config.py → logging_config.py → local data dir + sqlite
   review flow, and retried only through explicit `lawradar notify send`.
   The web server carries the config so web review POSTs fan out the
   same way; `/api/notifications` exposes recent attempts.
+- M12 adds: `evidence/bundle.py` - offline-verifiable exports so a third
+  party can audit an approved report without access to this host or
+  codebase. `bundles create` refuses anything a human has not approved,
+  re-hashes the stored original against its `content_sha256` before
+  including it, and writes a deterministic ZIP (fixed timestamps, no
+  compression) so identical inputs give identical bytes. Verification
+  re-reads the manifest, recomputes every member hash, cross-checks the
+  sidecar, and enforces strict membership (no unknown or missing files;
+  the manifest files table must cover every member). Writes are
+  temp-file + atomic rename; the export lands in the `evidence_bundles`
+  audit table (migration `007`) and on the report page. Bundle digests
+  are unkeyed - like backups, they prove integrity against corruption,
+  not against an attacker who can rewrite the archive and its manifest
+  together.

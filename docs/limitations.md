@@ -1,4 +1,4 @@
-# Limitations (public disclosure — Milestone 11)
+# Limitations (public disclosure — Milestone 12)
 
 - Coverage: only the sources shown on `/sources` that are actually ingested.
   The pilot set is small (see `docs/coverage.md`); no completeness claim is made.
@@ -24,6 +24,13 @@
   operator controls. Failures mean "this attempt failed", not
   "nobody was notified"; `notify send` is the only retry path and
   delivery is attempted at most once per (report, target).
+- Evidence bundles: expiry-free exports of approved report content
+  including the original document bytes - once shared, the receiver
+  holds a copy of that evidence; treat bundles like published material.
+  Bundle checksums are unkeyed: they detect corruption and partial
+  files, not a determined attacker who rewrites both the archive and
+  its manifest. Verify with `lawradar bundles verify` before trusting
+  any bundle you did not export yourself.
 - Backups: `lawradar backup create` snapshots the SQLite DB, not raw/text
   corpora, config, or secrets. Snapshots are unencrypted and only as good
   as their off-host copy; a `.db` without its checksum/manifest sidecars is

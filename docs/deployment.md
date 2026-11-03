@@ -1,4 +1,4 @@
-# Deployment (public beta, M11)
+# Deployment (public beta, M12)
 
 The app stays usable locally with no paid service. Anything beyond
 loopback needs the guards below — there is no multi-user auth model.

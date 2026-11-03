@@ -1,4 +1,4 @@
-# Real-source pilot runbook (Milestone 8-11)
+# Real-source pilot runbook (Milestone 8-12)
 
 This is the operator procedure for running India Law Radar against real
 official sources. It exists because automation alone is not enough: the
@@ -28,6 +28,10 @@ script approve a report — humans close every loop.
 - `lawradar backup create --keep 14` - verified daily snapshot; `backup
   verify` is the trust check and `backup restore ... --force` is the
   recovery path (`docs/backup.md`).
+- `lawradar bundles create <report-id>` - offline evidence exports for
+  approved reports; `bundles verify` is how a third party (or you,
+  months later) checks one without trusting this machine. Export the
+  reports you rely on and store the zips off-host like backups.
 
 ## Daily loop (operator)
 
@@ -40,7 +44,7 @@ lawradar sources health
 
 # 2. Import anything a human must download (browser → file → provenance)
 lawradar ingest legislative-dept --file .\downloads\act-2026.pdf `
-  --title "The … Act, 2026" --url https://www.legislative.gov.in/…
+  --title "The … Act, 2026"     --url https://www.legislative.gov.in/…
 
 # 3. Triage: drafts are unpublished until approved
 lawradar review --list
@@ -52,6 +56,10 @@ lawradar review <id> --approve --reviewer "Your Name" --notes "compared <date>"
 
 # 4. Readers subscribe to approved reports only
 lawradar serve                      # http://127.0.0.1:8080/feed.xml
+
+# 5. Optional: freeze evidence you will rely on (self-verifying offline)
+lawradar bundles create <id>        # -> data/bundles/*.zip; verify before sharing
+
 ```
 
 ## Scheduling the sweep

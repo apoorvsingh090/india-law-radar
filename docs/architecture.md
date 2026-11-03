@@ -162,3 +162,10 @@ CLI (argparse) → config.py → logging_config.py → local data dir + sqlite
   user-supplied values are always bound parameters and escaped on the
   way out. The CLI and the web now filter through the same store
   functions, so a filter cannot behave differently in the two surfaces.
+- M20 adds: `brief.md` inside the evidence bundle (format version 2).
+  `create_bundle` calls the same `build_brief` the CLI and web serve, so
+  the readable page inside the archive can never diverge from the one
+  the app renders; the manifest hashes it and verification treats it as
+  a required member for v2 (present, hashed, UTF-8, Markdown-shaped).
+  Format version 1 bundles stay verifiable, which keeps older exports
+  trustworthy without a re-export.

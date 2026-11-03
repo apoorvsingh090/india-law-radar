@@ -7,6 +7,8 @@ one approved change report without access to the operator's host:
   sections, citations, review history, document provenance, and the
   version hashes involved
 - ``diff.txt`` - the deterministic diff text for the change
+- ``brief.md`` - the human-readable Markdown brief for the report
+  (Milestone 20; identical content to ``lawradar reports brief``)
 - ``document.bin`` + ``document.bin.sha256`` - the original downloaded
   bytes of the reported version (when the store retains them)
 - ``manifest.json`` - format metadata plus the sha256 and byte size of
@@ -38,11 +40,13 @@ from lawradar import __version__
 from lawradar.db import store
 
 BUNDLE_FORMAT = "lawradar-evidence-bundle"
-BUNDLE_VERSION = 1
+BUNDLE_VERSION = 2
+SUPPORTED_VERSIONS = frozenset({1, 2})
 BUNDLE_PREFIX = "lawradar-evidence"
 MANIFEST_MEMBER = "manifest.json"
 REPORT_MEMBER = "report.json"
 DIFF_MEMBER = "diff.txt"
+BRIEF_MEMBER = "brief.md"
 DOCUMENT_MEMBER = "document.bin"
 DOCUMENT_SIDECAR = "document.bin.sha256"
 _REQUIRED_MEMBERS = frozenset({MANIFEST_MEMBER, REPORT_MEMBER, DIFF_MEMBER})
@@ -256,6 +260,10 @@ def create_bundle(
 
     moment = (now or datetime.now(UTC)).astimezone(UTC)
     created_at = moment.strftime("%Y-%m-%dT%H:%M:%SZ")
+    from lawradar.reporting.brief import build_brief
+
+    brief_text = build_brief(conn, int(report["id"]), generated_at=created_at)
+    members[BRIEF_MEMBER] = brief_text.encode("utf-8")
     manifest = {
         "format": BUNDLE_FORMAT,
         "version": BUNDLE_VERSION,
@@ -344,9 +352,10 @@ def _verify_members(payload: dict[str, bytes]) -> dict:
     if manifest.get("format") != BUNDLE_FORMAT:
         raise BundleError(
             f"unsupported bundle format: {manifest.get('format')!r}")
-    if manifest.get("version") != BUNDLE_VERSION:
+    version = manifest.get("version")
+    if version not in SUPPORTED_VERSIONS:
         raise BundleError(
-            f"unsupported bundle version: {manifest.get('version')!r}")
+            f"unsupported bundle version: {version!r}")
     if not manifest.get("created_at"):
         raise BundleError("manifest missing created_at")
     report_id = manifest.get("report_id")
@@ -354,6 +363,8 @@ def _verify_members(payload: dict[str, bytes]) -> dict:
         raise BundleError("manifest report_id must be a positive integer")
     present = set(payload)
     expected = set(_REQUIRED_MEMBERS)
+    if version >= 2:
+        expected.add(BRIEF_MEMBER)
     if manifest.get("has_document") is True:
         expected |= {DOCUMENT_MEMBER, DOCUMENT_SIDECAR}
     missing = sorted(expected - present)
@@ -373,7 +384,20 @@ def _verify_members(payload: dict[str, bytes]) -> dict:
     _verify_hashes(files, payload)
     _verify_document(manifest, payload)
     _verify_report_json(manifest, payload)
+    if version >= 2:
+        _verify_brief(payload)
     return manifest
+
+
+def _verify_brief(payload: dict[str, bytes]) -> None:
+    try:
+        text = payload[BRIEF_MEMBER].decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise BundleError(
+            f"{BRIEF_MEMBER} is not valid UTF-8: {exc}") from exc
+    if not text.lstrip().startswith("# "):
+        raise BundleError(
+            f"{BRIEF_MEMBER} does not look like a Markdown brief")
 
 
 def _verify_hashes(files: dict, payload: dict[str, bytes]) -> None:

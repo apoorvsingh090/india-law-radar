@@ -5,6 +5,20 @@ All notable changes to India Law Radar will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.20.0] - 2026-11-03
+
+### Added
+
+- Milestone 20 (brief in bundle): `lawradar bundles create` now also
+  writes `brief.md` - the exact M15 Markdown brief - into the evidence
+  ZIP, so one approved report exports as a verifiable artifact and a
+  human-readable document together
+- Bundle format v2 hashes `brief.md` in the manifest like every other
+  member; `bundles verify` refuses a missing or tampered brief and
+  refuses a brief that is not UTF-8 or not Markdown-shaped
+- Backward compatible: version 1 bundles (no brief) still verify, and
+  the verifier accepts only versions 1 and 2
+
 ## [0.19.0] - 2026-11-03
 
 ### Added

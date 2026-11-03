@@ -5,17 +5,18 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
 Source-verifiable monitoring of official Indian legal documents.
-**Milestone 19 (this release):** web browsing parity - a new
-`/documents` page lists every stored document (title, source, type,
-jurisdiction, version count, last update) with server-side
-`source`/`type`/`jurisdiction` filters and links to each document page,
-and `/search` gains the same filter selects, passing them into both
-search engines. All filtering is SQL-side and every filter value is
-escaped in the form. Builds on M18 CLI filters, M17 durable SQLite
-connections, M16 the status page, M15 shareable briefs, M14 operator
-status, M13 conditional polling, M12 evidence bundles, M11 webhook
-notifications, M10 verifiable backups, M9 source health, the M8 radar
-loop, and `docs/pilot.md`. Still zero paid dependencies.
+**Milestone 20 (this release):** evidence bundles now carry the
+readable brief - `bundles create` additionally writes `brief.md`
+(the exact `reports brief` page) into the ZIP, so one approved report
+exports as both a verifiable artifact and a human-readable document.
+The manifest hashes it like every other member, `bundles verify`
+rejects a tampered or missing brief in format v2, and bundles exported
+before this milestone (format v1, no brief) still verify. Builds on
+M19 web filters, M18 CLI filters, M17 durable SQLite connections, M16
+the status page, M15 shareable briefs, M14 operator status, M13
+conditional polling, M12 evidence bundles, M11 webhook notifications,
+M10 verifiable backups, M9 source health, the M8 radar loop, and
+`docs/pilot.md`. Still zero paid dependencies.
 
 > Scope honesty: this MVP does **not** claim complete coverage of Indian law,
 > is not a substitute for a qualified advocate, and every future change report
@@ -54,7 +55,7 @@ lawradar serve
 Expected: `lawradar health` prints `health: OK` with three PASS lines;
 `pytest` passes (unit + integration).
 
-## CLI (Milestone 19)
+## CLI (Milestone 20)
 
 ```text
 lawradar init [--force]        dirs + config + migrate sqlite schema
@@ -115,7 +116,8 @@ Evidence bundles (M12): for anything already approved,
 `lawradar bundles create <report-id>` writes a deterministic
 `data/bundles/lawradar-evidence-r<id>-<UTC>.zip` containing
 `report.json` (summary, claims, citations, review history, document
-provenance, version hashes), `diff.txt`, and the original document as
+provenance, version hashes), `diff.txt`, `brief.md` (the readable
+Markdown page, M20), and the original document as
 `document.bin` with a `sha256` sidecar. `manifest.json` lists the
 SHA-256 and byte size of every member; `lawradar bundles verify PATH`
 recomputes all of them offline and refuses anything else (unknown
@@ -207,7 +209,8 @@ data/          local-only runtime data (git-ignored except README/.gitkeep)
 - M16: browser status page (`/status`) + dashboard attention badge (done)
 - M17: WAL + busy-timeout durable SQLite connections (done)
 - M18: CLI list/search filters for documents and reports (done)
-- M19: web documents browser + filtered search (done here)
+- M19: web documents browser + filtered search (done)
+- M20: readable brief embedded in evidence bundles (format v2) (done here)
 
 ## Safeguards
 

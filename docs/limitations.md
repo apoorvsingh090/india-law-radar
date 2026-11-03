@@ -1,4 +1,4 @@
-# Limitations (public disclosure — Milestone 19)
+# Limitations (public disclosure — Milestone 20)
 
 - Coverage: only the sources shown on `/sources` that are actually ingested.
   The pilot set is small (see `docs/coverage.md`); no completeness claim is made.
@@ -51,7 +51,10 @@
   readable summary, not evidence: it is unsigned and unhashed, so it
   proves nothing about the document itself. Forward the M12 evidence
   bundle when the artifact must be verifiable, and treat any shared
-  brief as published material. It is not legal advice.
+  brief as published material. It is not legal advice. Since M20 the
+  same brief also ships inside evidence bundles as `brief.md`, so a
+  shared ZIP contains both the readable page and the hashed evidence -
+  still unkeyed integrity, not an anti-tamper seal.
 - The `/status` page shows what this server's local database knows - the
   same caveats as `lawradar status` apply. It exposes counts, health
   states, and filesystem paths (database, newest backup) to anyone who

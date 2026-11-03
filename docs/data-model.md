@@ -66,6 +66,12 @@ the polled URL is the document identity; they let the next sweep send
 bytes. Empty strings mean "no validator cached" and produce a plain
 unconditional request.
 
+**Milestone 20 note (no schema change):** evidence bundles produced from
+this release use format version 2 and include `brief.md` (the readable
+Markdown brief) alongside `report.json` and `diff.txt`; the manifest
+hashes it, and verification in format 2 requires it. Format 1 bundles
+exported earlier remain verifiable as-is.
+
 **Milestone 17 note (no schema change):** the database runs in WAL
 mode. A live deployment therefore owns `lawradar.db` plus transient
 `lawradar.db-wal` and `lawradar.db-shm` sidecars; treat all three as

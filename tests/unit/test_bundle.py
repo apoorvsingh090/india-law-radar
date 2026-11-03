@@ -4,11 +4,13 @@ import io
 import json
 import zipfile
 from datetime import UTC, datetime
+from pathlib import Path
 
 import pytest
 
 from lawradar.db import store
 from lawradar.evidence.bundle import (
+    BRIEF_MEMBER,
     BUNDLE_FORMAT,
     DIFF_MEMBER,
     DOCUMENT_MEMBER,
@@ -143,7 +145,7 @@ def test_bundle_roundtrip_with_document(db, tmp_path):
     assert checked.document_sha256 == info.document_sha256
     assert checked.sha256 == info.sha256
     assert _members(info.path) == {
-        MANIFEST_MEMBER, REPORT_MEMBER, DIFF_MEMBER,
+        MANIFEST_MEMBER, REPORT_MEMBER, DIFF_MEMBER, BRIEF_MEMBER,
         DOCUMENT_MEMBER, DOCUMENT_SIDECAR}
 
     manifest = _manifest(info.path)
@@ -192,10 +194,11 @@ def test_bundle_without_stored_raw(db, tmp_path):
     checked = verify_bundle(info.path)
     assert not checked.has_document
     assert _members(info.path) == {MANIFEST_MEMBER, REPORT_MEMBER,
-                                   DIFF_MEMBER}
+                                   DIFF_MEMBER, BRIEF_MEMBER}
     manifest = _manifest(info.path)
     assert manifest["has_document"] is False
-    assert set(manifest["files"]) == {REPORT_MEMBER, DIFF_MEMBER}
+    assert set(manifest["files"]) == {
+        REPORT_MEMBER, DIFF_MEMBER, BRIEF_MEMBER}
 
 
 def test_tampered_raw_file_refuses(db, tmp_path):
@@ -323,3 +326,70 @@ def _rewrite_into_manifest(change):
 def test_get_evidence_bundle_unknown(db):
     conn, *_ = db
     assert store.get_evidence_bundle(conn, 3) is None
+
+
+def test_bundle_carries_readable_brief(db, tmp_path):
+    conn, _, _, rep = db
+    _approve(conn, rep)
+    info = create_bundle(conn, rep, tmp_path, data_dir=tmp_path / "data")
+    with zipfile.ZipFile(info.path) as zf:
+        brief = zf.read(BRIEF_MEMBER).decode("utf-8")
+    assert brief.startswith("# ")
+    assert "**Change report #" in brief
+    assert "not legal advice" in brief
+    manifest = _manifest(info.path)
+    assert manifest["version"] == 2
+    assert BRIEF_MEMBER in manifest["files"]
+
+
+def test_tampered_brief_fails_verification(db, tmp_path):
+    conn, _, _, rep = db
+    _approve(conn, rep)
+    info = create_bundle(conn, rep, tmp_path, data_dir=tmp_path / "data")
+    tampered = tmp_path / "tampered.zip"
+    tampered.write_bytes(Path(info.path).read_bytes())
+    _rewrite_zip(tampered, lambda payload: payload.update(
+        {BRIEF_MEMBER: b"# Rewritten by someone else\n"}))
+    with pytest.raises(BundleError, match="manifest hash mismatch"):
+        verify_bundle(tampered)
+
+
+def test_version1_bundle_without_brief_still_verifies(db, tmp_path):
+    """Bundles exported before M20 (version 1) remain verifiable."""
+    conn, _, _, rep = db
+    _approve(conn, rep)
+    info = create_bundle(conn, rep, tmp_path, data_dir=tmp_path / "data")
+    legacy = tmp_path / "legacy-v1.zip"
+    legacy.write_bytes(Path(info.path).read_bytes())
+
+    def downgrade(payload):
+        payload.pop(BRIEF_MEMBER)
+        manifest = json.loads(payload[MANIFEST_MEMBER])
+        manifest["version"] = 1
+        manifest["files"].pop(BRIEF_MEMBER)
+        payload[MANIFEST_MEMBER] = (
+            json.dumps(manifest, indent=2) + "\n").encode()
+
+    _rewrite_zip(legacy, downgrade)
+    checked = verify_bundle(legacy)
+    assert checked.report_id == rep
+    assert checked.has_document
+
+
+def test_version2_missing_brief_refuses(db, tmp_path):
+    conn, _, _, rep = db
+    _approve(conn, rep)
+    info = create_bundle(conn, rep, tmp_path, data_dir=tmp_path / "data")
+    broken = tmp_path / "no-brief.zip"
+    broken.write_bytes(Path(info.path).read_bytes())
+
+    def drop(payload):
+        payload.pop(BRIEF_MEMBER)
+        manifest = json.loads(payload[MANIFEST_MEMBER])
+        manifest["files"].pop(BRIEF_MEMBER)
+        payload[MANIFEST_MEMBER] = (
+            json.dumps(manifest, indent=2) + "\n").encode()
+
+    _rewrite_zip(broken, drop)
+    with pytest.raises(BundleError, match="missing bundle member"):
+        verify_bundle(broken)

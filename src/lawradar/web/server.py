@@ -184,6 +184,29 @@ class Handler(BaseHTTPRequestHandler):
                 elif path == "/api/search":
                     self._json(search_fts.search(
                         conn, query.get("q", [""])[0]))
+                elif (match := re.fullmatch(
+                        r"/reports/(\d+)/brief\.md", path)):
+                    from lawradar.ingestion.health import format_utc, utc_now
+                    from lawradar.reporting.brief import (
+                        BriefError,
+                        BriefRefused,
+                        build_brief,
+                    )
+
+                    report_id = int(match.group(1))
+                    try:
+                        text = build_brief(conn, report_id,
+                                           generated_at=format_utc(utc_now()))
+                    except BriefError as exc:
+                        self._send(404, str(exc), "text/plain; charset=utf-8")
+                        return
+                    except BriefRefused as exc:
+                        self._send(409, str(exc), "text/plain; charset=utf-8")
+                        return
+                    self._send(
+                        200, text, "text/markdown; charset=utf-8",
+                        headers={"Content-Disposition":
+                                 f'attachment; filename="report-{report_id}.md"'})
                 elif (match := re.fullmatch(r"/reports/(\d+)", path)):
                     self._report(conn, int(match.group(1)), query)
                 elif (match := re.fullmatch(r"/api/reports/(\d+)", path)):

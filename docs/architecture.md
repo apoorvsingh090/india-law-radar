@@ -120,3 +120,13 @@ CLI (argparse) → config.py → logging_config.py → local data dir + sqlite
   numbers into concrete next commands. Exit codes stay with `health`
   (setup) and `sources health` (sweeps) so the snapshot adds visibility
   without changing alerting semantics.
+- M15 adds: `reporting/brief.py` - a Markdown renderer for approved
+  reports, composing the rows M3/M4 already store (report JSON claims,
+  citations, review tasks, version hashes) into a page a human can
+  forward. It refuses anything not approved, never calls the network or
+  a model, and is deterministic for a fixed generated-at stamp. The CLI
+  (`reports brief`, `--out`, `--json`) and the web route
+  `/reports/<id>/brief.md` share the same function, so the readable
+  artifact cannot drift between interfaces. The M12 bundle remains the
+  verifiable artifact; the brief is explicitly labelled not legal
+  advice.

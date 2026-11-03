@@ -5,6 +5,25 @@ All notable changes to India Law Radar will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.15.0] - 2026-11-03
+
+### Added
+
+- Milestone 15 (shareable briefs): `lawradar reports brief <report-id>`
+  renders one approved report as deterministic Markdown - title, change
+  type, status, summary, affected sections, version hashes and
+  retrieval times, claims with their `c1..cN` citation labels, quoted
+  citation evidence with locators and official URLs, review history,
+  and reproduction commands
+- `--out PATH` writes the brief to a file; `--json` returns the
+  rendered text plus byte size; drafts are refused (exit 2) and unknown
+  report ids exit 1
+- `GET /reports/<id>/brief.md` serves the same document as a
+  `text/markdown` attachment (`409` while the report is unpublished,
+  `404` for unknown ids); approved report pages link to it
+- Briefs render only from stored rows (no network, no model) and state
+  plainly that they are not legal advice
+
 ## [0.14.0] - 2026-11-03
 
 ### Added

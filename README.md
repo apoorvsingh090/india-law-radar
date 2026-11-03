@@ -5,19 +5,20 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
 Source-verifiable monitoring of official Indian legal documents.
-**Milestone 14 (this release):** an operator snapshot - `lawradar status`
-answers "is this deployment healthy and what needs a human right now?"
-from local state only: source health (ok/stale/failing, disabled/manual/
-retired), document and version counts, report queue and review status,
-approved reports without an evidence bundle, failed webhook attempts,
-the newest backup (with sidecar presence), and the last ingestion run.
-`--json` and `GET /api/status` expose the same snapshot for dashboards
-and schedulers; an `attention` list names each actionable item.
-Builds on M13 conditional polling (cached `ETag`/`Last-Modified`,
-`304` = unchanged), M12 evidence bundles, M11 webhook notifications,
-M10 verifiable backups, M9 source health, the M8 radar loop
-(`lawradar watch`, Atom feed of **approved** reports), and
-`docs/pilot.md`. Still zero paid dependencies.
+**Milestone 15 (this release):** shareable Markdown briefs - `lawradar
+reports brief <id> [--out PATH]` renders one **approved** report as a
+single human-readable page (title, change type, summary, affected
+sections, version hashes, claims with citation labels, quoted citation
+evidence with official URLs, review history, and reproduction
+commands). Drafts are refused (exit 2), unknown ids exit 1, output is
+deterministic, and the same document downloads from
+`/reports/<id>/brief.md` (409 while unpublished). It is the readable
+counterpart to the verifiable M12 bundle. Builds on M14 operator status
+(`lawradar status`, `/api/status`), M13 conditional polling, M12
+evidence bundles, M11 webhook notifications, M10 verifiable backups,
+M9 source health, the M8 radar loop (`lawradar watch`, Atom feed of
+**approved** reports), and `docs/pilot.md`. Still zero paid
+dependencies.
 
 > Scope honesty: this MVP does **not** claim complete coverage of Indian law,
 > is not a substitute for a qualified advocate, and every future change report
@@ -56,7 +57,7 @@ lawradar serve
 Expected: `lawradar health` prints `health: OK` with three PASS lines;
 `pytest` passes (unit + integration).
 
-## CLI (Milestone 14)
+## CLI (Milestone 15)
 
 ```text
 lawradar init [--force]        dirs + config + migrate sqlite schema
@@ -80,6 +81,7 @@ lawradar reports show <id>   report + claims + citations
 lawradar reports generate    backfill anything ingest missed
 lawradar reports verify <id>  deterministic citation check (exit 1 on fail)
 lawradar reports summarise <id> [--ai]  reword summary (validated, no model by default)
+lawradar reports brief <id> [--out PATH]  approved report as a Markdown brief
 lawradar review --list        pending human-review queue
 lawradar review <id> --approve|--reject|--changes --reviewer R --notes "…"
 lawradar notify list [--report ID] [--status S]   webhook attempts (audit/triage)
@@ -142,6 +144,15 @@ present, and the last ingestion run - followed by an `attention` list
 and exits 0 (1 only when no database exists yet); use `lawradar health`
 for start-up gating and `lawradar sources health` for sweep alerting.
 
+Shareable briefs (M15): `lawradar reports brief <id>` renders an
+approved report as one Markdown page with its claims, quoted citation
+evidence, official URLs, review history, and reproduction commands
+(`--out PATH` writes a file; `--json` returns the text). Drafts are
+refused and nothing is ever rendered for unpublished work; the same
+document is available from `/reports/<id>/brief.md` on the web server
+(409 until approved). Briefs are readable, not verifiable - use the
+M12 evidence bundle when the artifact itself must be checked offline.
+
 Try without network: `lawradar ingest fixture-sample --sources-file
 config/sources.example.yaml` twice — the second run reports `changed=0`
 (idempotent dedup). All fixture titles carry a `[FIXTURE]` marker and
@@ -186,7 +197,8 @@ data/          local-only runtime data (git-ignored except README/.gitkeep)
 - M11: outbound webhook notifications of approved reports (done)
 - M12: offline-verifiable evidence bundle exports (done)
 - M13: conditional HTTP polling with cached validators (done)
-- M14: operator status snapshot (`lawradar status`, `/api/status`) (done here)
+- M14: operator status snapshot (`lawradar status`, `/api/status`) (done)
+- M15: shareable Markdown briefs (`reports brief`, `/reports/<id>/brief.md`) (done here)
 
 ## Safeguards
 

@@ -1,4 +1,4 @@
-# Limitations (public disclosure — Milestone 14)
+# Limitations (public disclosure — Milestone 15)
 
 - Coverage: only the sources shown on `/sources` that are actually ingested.
   The pilot set is small (see `docs/coverage.md`); no completeness claim is made.
@@ -45,6 +45,13 @@
   stale, and pending-review counts say nothing about review quality.
   Never ingested sources and silent failures outside the DB are still
   only visible through `lawradar sources list` / logs.
+- Briefs: `lawradar reports brief` renders stored rows only; it inherits
+  every upstream limitation (extraction quality, citation verification
+  status, human review depth) and adds no new checks. A brief is a
+  readable summary, not evidence: it is unsigned and unhashed, so it
+  proves nothing about the document itself. Forward the M12 evidence
+  bundle when the artifact must be verifiable, and treat any shared
+  brief as published material. It is not legal advice.
 - Backups: `lawradar backup create` snapshots the SQLite DB, not raw/text
   corpora, config, or secrets. Snapshots are unencrypted and only as good
   as their off-host copy; a `.db` without its checksum/manifest sidecars is

@@ -1,4 +1,4 @@
-"""Command-line interface for India Law Radar (Milestone 14).
+"""Command-line interface for India Law Radar (Milestone 15).
 
 Implemented commands (all functional, no placeholders):
   lawradar init              — create data dir, local settings.yaml, migrate db
@@ -16,6 +16,7 @@ Implemented commands (all functional, no placeholders):
   lawradar reports generate  — backfill reports missed by auto-generation
   lawradar reports verify <id> — deterministic citation check
   lawradar reports summarise <id> [--ai] — reword summary (validated)
+  lawradar reports brief <id> [--out PATH] — approved report as Markdown
   lawradar review --list     — pending human-review queue
   lawradar review <id> --approve|--reject|--changes --notes "..."
   lawradar notify list       — webhook delivery attempts (audit/triage)
@@ -148,6 +149,11 @@ def build_parser() -> argparse.ArgumentParser:
     p_rsum.add_argument("report_id", type=int)
     p_rsum.add_argument("--ai", action="store_true",
                         help="Use the configured external AI command")
+    p_rbrief = reports_sub.add_parser(
+        "brief", help="Render an approved report as shareable Markdown")
+    p_rbrief.add_argument("report_id", type=int)
+    p_rbrief.add_argument("--out", default=None,
+                          help="Write to PATH instead of stdout")
 
     p_review = sub.add_parser("review", help="Human review queue + decisions")
     p_review.add_argument("report_id", nargs="?", type=int, default=None,
@@ -307,7 +313,7 @@ def cmd_init(args: argparse.Namespace) -> int:
     return 0
 
 
-APP_LABEL = f"India Law Radar v{__version__} (Milestone 14)"
+APP_LABEL = f"India Law Radar v{__version__} (Milestone 15)"
 
 
 def _sqlite_path(db_url: str, data_dir: Path) -> Path | None:
@@ -776,6 +782,38 @@ def cmd_reports(args: argparse.Namespace) -> int:
             else:
                 print(f"report {outcome['report_id']}: summary "
                       f"{outcome['status']} via {outcome['summariser']}")
+        elif args.reports_command == "brief":
+            from lawradar.ingestion.health import format_utc, utc_now
+            from lawradar.reporting.brief import (
+                BriefError,
+                BriefRefused,
+                build_brief,
+            )
+
+            try:
+                text = build_brief(conn, args.report_id,
+                                   generated_at=format_utc(utc_now()))
+            except BriefRefused as exc:
+                print(f"brief refused: {exc}", file=sys.stderr)
+                return 2
+            except BriefError as exc:
+                print(f"brief failed: {exc}", file=sys.stderr)
+                return 1
+            payload_bytes = len(text.encode("utf-8"))
+            if args.json:
+                print(json.dumps({"report_id": args.report_id,
+                                  "bytes": payload_bytes,
+                                  "out": args.out or "",
+                                  "markdown": text}, indent=2))
+                return 0
+            if args.out:
+                path = Path(args.out)
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(text, encoding="utf-8")
+                print(f"wrote {path} ({payload_bytes} bytes)")
+            else:
+                print(text, end="")
+            return 0
     finally:
         conn.close()
     return 0

@@ -227,6 +227,9 @@ def report_detail(report: dict, document: dict, versions: list[dict],
         f"{esc(document.get('official_url', '') or 'not recorded')}</a> · "
         f"<b>Published:</b> unknown (never inferred)</p>"
         f"<p>{esc(report['summary'])}</p>"
+        + (f"<p><a href=\"/reports/{report['id']}/brief.md\">"
+           "Download Markdown brief</a></p>"
+           if report['verification_status'] == 'approved' else "")
         + (f"<p><b>Affected:</b> {esc(', '.join(affected))}</p>" if affected else "")
         + "<p><b>Commencement:</b> Not established from the extracted "
         "evidence (unverified).</p>"

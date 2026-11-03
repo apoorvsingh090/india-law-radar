@@ -137,3 +137,14 @@ CLI (argparse) → config.py → logging_config.py → local data dir + sqlite
   the status page is server-rendered HTML with every stored string
   escaped and no scripts, so the M7 security headers keep working
   unchanged.
+- M17 adds: durable connections. `store.connect` opens every database
+  in WAL mode with a 5s busy timeout, enforced foreign keys, and
+  `synchronous=NORMAL`. WAL lets long-running `serve` readers and a
+  concurrent `watch` writer proceed without serialising on the rollback
+  journal, and the busy timeout converts brief write collisions into
+  short waits instead of `database is locked` errors. The backup path
+  was already WAL-safe (`Connection.backup()`), restore removes stale
+  sidecars, and `health` surfaces the observed journal mode. WAL creates
+  `-wal`/`-shm` files beside the database while collected - they are
+  part of the live database and must not be copied or deleted under a
+  running writer.

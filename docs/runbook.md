@@ -18,6 +18,10 @@
   checksum; `/api/bundles` serves the same rows as JSON
 - `lawradar backup verify <file>` - newest snapshot trust check; see
   `docs/backup.md` for the restore drill
+- Database files: the live DB runs in WAL mode, so `lawradar.db` may be
+  accompanied by `lawradar.db-wal` / `lawradar.db-shm` while a writer is
+  active. Never delete or hand-copy them under a running `serve`/`watch`;
+  use `lawradar backup create` for anything you rely on.
 - Dashboard `/` — ingestion failures + coverage warnings section
 - Logs: stdout/stderr (structured `timestamp | level | logger | message`);
   optional file via `LAWRADAR_LOG_FILE`

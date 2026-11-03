@@ -1,4 +1,4 @@
-# Limitations (public disclosure — Milestone 16)
+# Limitations (public disclosure — Milestone 17)
 
 - Coverage: only the sources shown on `/sources` that are actually ingested.
   The pilot set is small (see `docs/coverage.md`); no completeness claim is made.
@@ -57,6 +57,12 @@
   states, and filesystem paths (database, newest backup) to anyone who
   can reach the server; the default loopback bind and the
   token-for-non-loopback rule are what limit that exposure.
+- Durability: WAL mode improves concurrency, not backups of unrelated
+  files. While a writer is active the live database is
+  `lawradar.db` + `-wal` + `-shm`; copying only the `.db` by hand can
+  capture a stale state. Use `lawradar backup create` (online backup
+  API, checksummed) for any copy you intend to rely on, and keep
+  off-host copies as before.
 - Backups: `lawradar backup create` snapshots the SQLite DB, not raw/text
   corpora, config, or secrets. Snapshots are unencrypted and only as good
   as their off-host copy; a `.db` without its checksum/manifest sidecars is

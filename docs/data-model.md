@@ -65,3 +65,11 @@ the polled URL is the document identity; they let the next sweep send
 `If-None-Match` / `If-Modified-Since` and skip downloading unchanged
 bytes. Empty strings mean "no validator cached" and produce a plain
 unconditional request.
+
+**Milestone 17 note (no schema change):** the database runs in WAL
+mode. A live deployment therefore owns `lawradar.db` plus transient
+`lawradar.db-wal` and `lawradar.db-shm` sidecars; treat all three as
+one unit and never hand-copy just the `.db` file while a writer is
+running. `lawradar backup create` snapshots through SQLite's online
+backup API, so a verified backup is a complete, self-contained database
+regardless of WAL state.

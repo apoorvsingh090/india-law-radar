@@ -5,15 +5,14 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
 Source-verifiable monitoring of official Indian legal documents.
-**Milestone 16 (this release):** the operator snapshot reaches the
-browser - `GET /status` renders the same local-state view as
-`lawradar status` (attention list, source health counts, document and
-report totals, review queue, unexported approved reports, webhook
-failures, schema-pending warning, last run, newest backup) with no
-JavaScript and no network calls, and the dashboard shows an
-"items need attention" badge linking to it. Read-only and escaped like
-every other page. Builds on M15 shareable Markdown briefs, M14 operator
-status (`lawradar status`, `/api/status`), M13 conditional polling, M12
+**Milestone 17 (this release):** durable connections - every SQLite
+connection now runs in WAL mode with a 5-second busy timeout, enforced
+foreign keys, and `synchronous=NORMAL`, so `lawradar serve` readers and
+`lawradar watch` writers stop fighting over the database file. Backups
+already use SQLite's online backup API (WAL-safe); restore still cleans
+stale `-wal`/`-shm` sidecars, and `lawradar health` now reports the
+journal mode it finds. Builds on M16 the browser status page, M15
+shareable briefs, M14 operator status, M13 conditional polling, M12
 evidence bundles, M11 webhook notifications, M10 verifiable backups,
 M9 source health, the M8 radar loop, and `docs/pilot.md`. Still zero
 paid dependencies.
@@ -55,7 +54,7 @@ lawradar serve
 Expected: `lawradar health` prints `health: OK` with three PASS lines;
 `pytest` passes (unit + integration).
 
-## CLI (Milestone 16)
+## CLI (Milestone 17)
 
 ```text
 lawradar init [--force]        dirs + config + migrate sqlite schema
@@ -203,7 +202,8 @@ data/          local-only runtime data (git-ignored except README/.gitkeep)
 - M13: conditional HTTP polling with cached validators (done)
 - M14: operator status snapshot (`lawradar status`, `/api/status`) (done)
 - M15: shareable Markdown briefs (`reports brief`, `/reports/<id>/brief.md`) (done)
-- M16: browser status page (`/status`) + dashboard attention badge (done here)
+- M16: browser status page (`/status`) + dashboard attention badge (done)
+- M17: WAL + busy-timeout durable SQLite connections (done here)
 
 ## Safeguards
 

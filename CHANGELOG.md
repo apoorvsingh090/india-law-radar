@@ -5,6 +5,24 @@ All notable changes to India Law Radar will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.17.0] - 2026-11-03
+
+### Changed
+
+- Milestone 17 (durable connections): every `store.connect()` now uses
+  `PRAGMA journal_mode=WAL` (falling back silently on filesystems that
+  refuse it), `PRAGMA busy_timeout=5000`, `PRAGMA foreign_keys=ON`, and
+  `PRAGMA synchronous=NORMAL`; a momentary writer collision waits
+  instead of failing with "database is locked"
+- `lawradar health` reports the journal mode it observes for the
+  database (`journal=wal`), so WAL is visible evidence rather than a
+  hidden setting
+- Backups need no change: `backup create` already copies through
+  SQLite's online backup API (WAL-safe), and `backup restore` still
+  removes stale `-wal`/`-shm` sidecars. The new `tests/unit/test_store.py`
+  covers the pragmas, real foreign-key enforcement, and the wait-then-
+  succeed behavior under a competing writer.
+
 ## [0.16.0] - 2026-11-03
 
 ### Added

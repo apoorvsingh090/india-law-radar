@@ -1,4 +1,4 @@
-"""Command-line interface for India Law Radar (Milestone 16).
+"""Command-line interface for India Law Radar (Milestone 17).
 
 Implemented commands (all functional, no placeholders):
   lawradar init              — create data dir, local settings.yaml, migrate db
@@ -313,7 +313,7 @@ def cmd_init(args: argparse.Namespace) -> int:
     return 0
 
 
-APP_LABEL = f"India Law Radar v{__version__} (Milestone 16)"
+APP_LABEL = f"India Law Radar v{__version__} (Milestone 17)"
 
 
 def _sqlite_path(db_url: str, data_dir: Path) -> Path | None:
@@ -372,9 +372,11 @@ def run_health_checks(config) -> dict:
                     mig_detail = f", migrations={applied}"
                 except sqlite3.OperationalError:
                     mig_detail = ", migrations=none"
+                journal = conn.execute(
+                    "PRAGMA journal_mode").fetchone()[0]
                 checks["sqlite"] = {
                     "ok": True,
-                    "detail": f"{db_path}{mig_detail}",
+                    "detail": f"{db_path}{mig_detail}, journal={journal}",
                 }
             finally:
                 conn.close()

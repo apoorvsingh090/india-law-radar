@@ -3,6 +3,13 @@
 Owns schema migrations (``migrations/*.sql`` applied in order) and all
 CRUD for sources, documents, versions, and ingestion runs. Postgres can
 replace this module in deployment; callers only use these functions.
+
+Every connection is opened in durable mode (Milestone 17): WAL journal
+so ``serve`` readers and ``watch`` writers do not block each other,
+``busy_timeout`` so a brief write collision waits instead of failing,
+foreign keys enforced, and ``synchronous=NORMAL`` (safe under WAL for
+this workload). Backups already use SQLite's online backup API, which is
+WAL-safe, and restore cleans stale ``-wal``/``-shm`` sidecars.
 """
 from __future__ import annotations
 
@@ -11,15 +18,24 @@ import sqlite3
 from pathlib import Path
 
 MIGRATIONS_DIR = Path(__file__).resolve().parents[3] / "migrations"
+BUSY_TIMEOUT_MS = 5000
 
 
 def connect(db_path: str | Path) -> sqlite3.Connection:
     path = Path(db_path)
     if str(path.parent) not in ("", "."):
         path.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(path)
+    conn = sqlite3.connect(path, timeout=BUSY_TIMEOUT_MS / 1000)
     conn.row_factory = sqlite3.Row
+    conn.execute(f"PRAGMA busy_timeout = {BUSY_TIMEOUT_MS}")
     conn.execute("PRAGMA foreign_keys = ON")
+    try:
+        conn.execute("PRAGMA journal_mode = WAL")
+    except sqlite3.DatabaseError:
+        # A read-only or exotic filesystem may refuse WAL; the connection
+        # still works in the default rollback-journal mode.
+        pass
+    conn.execute("PRAGMA synchronous = NORMAL")
     return conn
 
 

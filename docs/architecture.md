@@ -130,3 +130,10 @@ CLI (argparse) → config.py → logging_config.py → local data dir + sqlite
   artifact cannot drift between interfaces. The M12 bundle remains the
   verifiable artifact; the brief is explicitly labelled not legal
   advice.
+- M16 adds: the `/status` page in the web server, rendering the same
+  `collect_status` dict the CLI and `/api/status` use. One composition
+  function, three surfaces - nothing can drift. The dashboard embeds
+  only the attention count and a link, keeping the landing page cheap;
+  the status page is server-rendered HTML with every stored string
+  escaped and no scripts, so the M7 security headers keep working
+  unchanged.

@@ -91,3 +91,29 @@ def test_api_status_endpoint(setup):
     finally:
         server.shutdown()
         thread.join(timeout=5)
+
+
+def test_status_page_and_dashboard_link(setup):
+    _, tmp_path = setup
+    server = build_server(
+        str(tmp_path / "data" / "lawradar.db"),
+        host="127.0.0.1", port=0, token="")
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    base = f"http://127.0.0.1:{server.server_address[1]}"
+    try:
+        with urllib.request.urlopen(base + "/status", timeout=10) as resp:
+            assert resp.status == 200
+            html = resp.read().decode("utf-8")
+        assert "read-only and uses local state only" in html
+        assert "<h3>Attention</h3>" in html
+        assert "<h3>Sources</h3>" in html
+        assert "<h3>Newest backup</h3>" in html
+        assert "lawradar status --json" in html
+
+        with urllib.request.urlopen(base + "/", timeout=10) as resp:
+            dashboard = resp.read().decode("utf-8")
+        assert 'href="/status"' in dashboard
+    finally:
+        server.shutdown()
+        thread.join(timeout=5)

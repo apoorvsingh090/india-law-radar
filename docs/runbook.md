@@ -5,7 +5,8 @@
 - CLI output + `lawradar health` (config, data dir, sqlite + migrations)
 - `lawradar status` - one-screen snapshot of sources, queue, exports,
   backup, last run, and an `attention` list of items needing a human
-  (`--json` or `/api/status` for scripts)
+  (`--json`, `/api/status`, or the `/status` page for scripts and
+  browsers)
 - `lawradar sources health` — `ok`/`due`/`stale`/`failing` per source,
   next-due times, exit 1 when a monitored source needs attention
 - `lawradar sources list` — per-source `last_error`, `last_check`

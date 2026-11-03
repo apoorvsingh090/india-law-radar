@@ -112,6 +112,8 @@ class Handler(BaseHTTPRequestHandler):
                     self._page("Review queue",
                                pages.review_page([dict(t) for t in tasks],
                                                  self._token_value(query)))
+                elif path == "/status":
+                    self._status_page(conn)
                 elif path == "/coverage":
                     self._coverage(conn)
                 elif path == "/privacy":
@@ -153,17 +155,7 @@ class Handler(BaseHTTPRequestHandler):
                     self._send(200, feeds.atom_feed(rows),
                                "application/atom+xml; charset=utf-8")
                 elif path == "/api/status":
-                    from lawradar.status import collect_status
-
-                    config = self.server.config
-                    if config is None:
-                        config = SimpleNamespace(
-                            db_url=f"sqlite:///{self.server.db_path}",
-                            data_dir=str(Path(self.server.db_path).parent),
-                            notify_enabled=False,
-                            notify_webhooks=[],
-                        )
-                    self._json(collect_status(conn, config))
+                    self._json(self._status_snapshot(conn))
                 elif path == "/api/sources/health":
                     items = evaluate_sources(
                         [dict(r) for r in store.list_sources(conn)])
@@ -245,7 +237,24 @@ class Handler(BaseHTTPRequestHandler):
             "recent_reports": reports, "pending_review": pending,
             "failed_runs": failed, "coverage_gaps": gaps,
             "unpublished": unpublished,
-            "notify_failures": store.count_failed_attempts(conn)}))
+            "notify_failures": store.count_failed_attempts(conn),
+            "attention": self._status_snapshot(conn)["attention"]}))
+
+    def _status_snapshot(self, conn) -> dict:
+        from lawradar.status import collect_status
+
+        config = self.server.config
+        if config is None:
+            config = SimpleNamespace(
+                db_url=f"sqlite:///{self.server.db_path}",
+                data_dir=str(Path(self.server.db_path).parent),
+                notify_enabled=False,
+                notify_webhooks=[],
+            )
+        return collect_status(conn, config)
+
+    def _status_page(self, conn) -> None:
+        self._page("Status", pages.status_page(self._status_snapshot(conn)))
 
     def _changes(self, conn, query: dict) -> None:
         filt = {k: query.get(k, [""])[0]

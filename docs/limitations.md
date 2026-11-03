@@ -1,4 +1,4 @@
-# Limitations (public disclosure — Milestone 15)
+# Limitations (public disclosure — Milestone 16)
 
 - Coverage: only the sources shown on `/sources` that are actually ingested.
   The pilot set is small (see `docs/coverage.md`); no completeness claim is made.
@@ -52,6 +52,11 @@
   proves nothing about the document itself. Forward the M12 evidence
   bundle when the artifact must be verifiable, and treat any shared
   brief as published material. It is not legal advice.
+- The `/status` page shows what this server's local database knows - the
+  same caveats as `lawradar status` apply. It exposes counts, health
+  states, and filesystem paths (database, newest backup) to anyone who
+  can reach the server; the default loopback bind and the
+  token-for-non-loopback rule are what limit that exposure.
 - Backups: `lawradar backup create` snapshots the SQLite DB, not raw/text
   corpora, config, or secrets. Snapshots are unencrypted and only as good
   as their off-host copy; a `.db` without its checksum/manifest sidecars is

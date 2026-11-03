@@ -5,20 +5,18 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
 Source-verifiable monitoring of official Indian legal documents.
-**Milestone 15 (this release):** shareable Markdown briefs - `lawradar
-reports brief <id> [--out PATH]` renders one **approved** report as a
-single human-readable page (title, change type, summary, affected
-sections, version hashes, claims with citation labels, quoted citation
-evidence with official URLs, review history, and reproduction
-commands). Drafts are refused (exit 2), unknown ids exit 1, output is
-deterministic, and the same document downloads from
-`/reports/<id>/brief.md` (409 while unpublished). It is the readable
-counterpart to the verifiable M12 bundle. Builds on M14 operator status
-(`lawradar status`, `/api/status`), M13 conditional polling, M12
+**Milestone 16 (this release):** the operator snapshot reaches the
+browser - `GET /status` renders the same local-state view as
+`lawradar status` (attention list, source health counts, document and
+report totals, review queue, unexported approved reports, webhook
+failures, schema-pending warning, last run, newest backup) with no
+JavaScript and no network calls, and the dashboard shows an
+"items need attention" badge linking to it. Read-only and escaped like
+every other page. Builds on M15 shareable Markdown briefs, M14 operator
+status (`lawradar status`, `/api/status`), M13 conditional polling, M12
 evidence bundles, M11 webhook notifications, M10 verifiable backups,
-M9 source health, the M8 radar loop (`lawradar watch`, Atom feed of
-**approved** reports), and `docs/pilot.md`. Still zero paid
-dependencies.
+M9 source health, the M8 radar loop, and `docs/pilot.md`. Still zero
+paid dependencies.
 
 > Scope honesty: this MVP does **not** claim complete coverage of Indian law,
 > is not a substitute for a qualified advocate, and every future change report
@@ -57,7 +55,7 @@ lawradar serve
 Expected: `lawradar health` prints `health: OK` with three PASS lines;
 `pytest` passes (unit + integration).
 
-## CLI (Milestone 15)
+## CLI (Milestone 16)
 
 ```text
 lawradar init [--force]        dirs + config + migrate sqlite schema
@@ -153,6 +151,12 @@ document is available from `/reports/<id>/brief.md` on the web server
 (409 until approved). Briefs are readable, not verifiable - use the
 M12 evidence bundle when the artifact itself must be checked offline.
 
+Status page (M16): `GET /status` shows the same operator snapshot in
+the browser (attention list, source health, counts, schema warning,
+last run, newest backup), and the dashboard links to it whenever
+something needs a human. It is read-only, renders server-side, and
+escapes all stored text.
+
 Try without network: `lawradar ingest fixture-sample --sources-file
 config/sources.example.yaml` twice — the second run reports `changed=0`
 (idempotent dedup). All fixture titles carry a `[FIXTURE]` marker and
@@ -198,7 +202,8 @@ data/          local-only runtime data (git-ignored except README/.gitkeep)
 - M12: offline-verifiable evidence bundle exports (done)
 - M13: conditional HTTP polling with cached validators (done)
 - M14: operator status snapshot (`lawradar status`, `/api/status`) (done)
-- M15: shareable Markdown briefs (`reports brief`, `/reports/<id>/brief.md`) (done here)
+- M15: shareable Markdown briefs (`reports brief`, `/reports/<id>/brief.md`) (done)
+- M16: browser status page (`/status`) + dashboard attention badge (done here)
 
 ## Safeguards
 

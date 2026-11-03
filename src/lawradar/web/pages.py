@@ -55,7 +55,8 @@ def layout(title: str, body: str) -> str:
         "<a href=\"/\">Dashboard</a><a href=\"/changes\">Changes</a>"
         "<a href=\"/feed.xml\">Feed</a>"
         "<a href=\"/search\">Search</a><a href=\"/sources\">Sources</a>"
-        "<a href=\"/review\">Review</a><a href=\"/coverage\">Coverage</a>"
+        "<a href=\"/review\">Review</a><a href=\"/status\">Status</a>"
+        "<a href=\"/coverage\">Coverage</a>"
         "<a href=\"/limitations\">Limitations</a>"
         "<a href=\"/feedback\">Feedback</a><a href=\"/privacy\">Privacy</a>"
         "</nav></header><main>"
@@ -93,11 +94,18 @@ def dashboard(ctx: dict) -> str:
                    "</span> in recent attempts. See report pages for "
                    "per-target detail; <code>lawradar notify send</code> "
                    "retries failed targets.</p>" if notify_failures else "")
+    attention = ctx.get("attention") or []
+    attention_html = (
+        "<p><span class=\"badge bad\">"
+        f"{len(attention)} item(s) need attention</span> "
+        "<a href=\"/status\">Open the status page</a> for details."
+        "</p>" if attention else "")
     return (
         f"<p>{ctx['source_count']} configured sources · "
         f"{monitored} monitored, {unhealthy} need attention · "
         f"{ctx['pending_review']} pending reviews · "
         f"{ctx['unpublished']} unpublished reports</p>"
+        + attention_html
         + notify_html
         + "<h3>Sources</h3><table><tr><th>ID</th><th>Name</th><th>State</th>"
         "<th>Health detail</th><th>Last success</th></tr>"
@@ -105,6 +113,76 @@ def dashboard(ctx: dict) -> str:
         + "<h3>Recent changes</h3><ul>" + (recent or "<li>None yet.</li>") + "</ul>"
         + "<h3>Ingestion failures</h3><ul>" + failures + "</ul>"
         + "<h3>Coverage warnings</h3><ul>" + gaps + "</ul>")
+
+
+def status_page(snapshot: dict) -> str:
+    app = snapshot["app"]
+    sources = snapshot["sources"]
+    docs = snapshot["documents"]
+    reports = snapshot["reports"]
+    notify = snapshot["notifications"]
+    attention = snapshot.get("attention") or []
+    attention_html = (
+        "<ul>" + "".join(f"<li>{esc(item)}</li>" for item in attention)
+        + "</ul>"
+        if attention
+        else "<p><span class=\"badge\">Nothing needs attention.</span></p>")
+    pending = app.get("pending_migrations") or []
+    pending_html = (
+        f"<p><span class=\"badge bad\">Schema behind: "
+        f"{esc(', '.join(pending))} pending</span> Run "
+        "<code>lawradar init</code>.</p>" if pending else "")
+    run = snapshot.get("last_run")
+    if run:
+        run_html = (
+            f"<li>run {esc(str(run['id']))} on {esc(run['source_id'])}: "
+            f"{esc(run['status'])} (changed {esc(str(run['documents_changed']))})"
+            f" at {esc(run['started_at'])}</li>")
+    else:
+        run_html = "<li>No ingestion runs recorded.</li>"
+    backup = snapshot.get("backup")
+    if backup:
+        sidecar = ("" if backup["verified_sidecar"]
+                   else " <span class=\"badge bad\">sidecar missing</span>")
+        backup_html = (f"<li>{esc(backup['name'])} "
+                       f"({esc(str(backup['bytes']))} bytes){sidecar}</li>")
+    else:
+        backup_html = "<li>No backups found.</li>"
+    ok_count = (sources["monitored"] - sources["stale"] - sources["failing"])
+    return (
+        f"<p>Generated {esc(snapshot['generated_at'])} by "
+        f"v{esc(app['version'])}. This page is read-only and uses local "
+        "state only; <code>lawradar status --json</code> serves the same "
+        "data.</p>"
+        + "<h3>Attention</h3>" + attention_html
+        + "<h3>Sources</h3><ul>"
+        f"<li>{esc(str(sources['monitored']))} monitored "
+        f"(ok {esc(str(ok_count))}, stale {esc(str(sources['stale']))}, "
+        f"failing {esc(str(sources['failing']))})</li>"
+        f"<li>disabled {esc(str(sources['disabled']))}, "
+        f"manual {esc(str(sources['manual']))}, "
+        f"retired {esc(str(sources['retired']))}</li></ul>"
+        + "<h3>Data</h3><ul>"
+        f"<li>{esc(str(docs['documents']))} documents, "
+        f"{esc(str(docs['versions']))} versions</li>"
+        f"<li>{esc(str(reports['total']))} reports: "
+        f"{esc(str(reports['pending_review']))} pending review, "
+        f"{esc(str(reports['approved']))} approved, "
+        f"{esc(str(reports['rejected']))} rejected, "
+        f"{esc(str(reports['needs_changes']))} needing changes</li>"
+        f"<li>{esc(str(reports['approved_without_bundle']))} approved "
+        "report(s) without an evidence bundle</li></ul>"
+        + "<h3>Notifications</h3><ul>"
+        f"<li>{'enabled' if notify['enabled'] else 'disabled'} "
+        f"({esc(str(notify['targets']))} targets), "
+        f"{esc(str(notify['failed_attempts']))} failed recent "
+        "attempt(s)</li></ul>"
+        + "<h3>Database</h3><ul>"
+        f"<li>{esc(app['db_path'])} ({esc(str(app['db_bytes']))} bytes, "
+        f"{esc(str(app['migrations']))} migrations applied)</li></ul>"
+        + pending_html
+        + "<h3>Last run</h3><ul>" + run_html + "</ul>"
+        + "<h3>Newest backup</h3><ul>" + backup_html + "</ul>")
 
 
 def changes_feed(reports: list[dict], filters: dict,

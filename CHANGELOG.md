@@ -5,6 +5,21 @@ All notable changes to India Law Radar will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.16.0] - 2026-11-03
+
+### Added
+
+- Milestone 16 (status page): `GET /status` renders the M14 operator
+  snapshot server-side - attention items, source health counts, document
+  and report totals, review queue, approved reports without a bundle,
+  webhook failures, a schema-pending warning, the last ingestion run,
+  and the newest backup (with sidecar state)
+- The dashboard shows an "items need attention" badge linking to
+  `/status` whenever the attention list is non-empty
+- The page is read-only, requires no JavaScript, makes no network calls,
+  and escapes all stored text; `/api/status` and `lawradar status
+  --json` remain the machine-readable equivalents
+
 ## [0.15.0] - 2026-11-03
 
 ### Added

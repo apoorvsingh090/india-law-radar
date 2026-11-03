@@ -85,34 +85,49 @@ def ensure_indexed(conn) -> int:
     return reindex(conn)
 
 
-def search(conn, query: str, limit: int = 20) -> list[dict]:
-    """Search titles + extracted text. Returns dicts with snippets."""
+def search(conn, query: str, limit: int = 20, *,
+           source: str | None = None,
+           doc_type: str | None = None,
+           jurisdiction: str | None = None) -> list[dict]:
+    """Search titles + extracted text. Returns dicts with snippets.
+
+    Filters (M18) narrow by document metadata without changing ranking.
+    """
     query = (query or "").strip()
     if not query:
         return []
+    filter_pairs = [("d.source_id", source), ("d.document_type", doc_type),
+                    ("d.jurisdiction", jurisdiction)]
+    filters = [(column, value) for column, value in filter_pairs if value]
     if fts_available(conn):
         try:
+            extra = "".join(f" AND {column} = ?" for column, _ in filters)
             rows = conn.execute(
                 "SELECT s.doc_id AS id, s.title AS title, "
                 "snippet(search_fts, 1, '<b>', '</b>', ' … ', 12) AS snippet "
                 "FROM search_fts JOIN search_index s "
                 "ON s.rowid = search_fts.rowid "
-                "WHERE search_fts MATCH ? ORDER BY rank LIMIT ?",
-                (_safe_match(query), limit)).fetchall()
+                "JOIN documents d ON d.id = s.doc_id "
+                "WHERE search_fts MATCH ?" + extra
+                + " ORDER BY rank LIMIT ?",
+                (_safe_match(query),
+                 *[value for _, value in filters], limit)).fetchall()
             return [{"id": r["id"], "title": r["title"],
                      "snippet": r["snippet"], "engine": "fts"}
                     for r in rows]
         except Exception:  # noqa: BLE001 — bad MATCH syntax falls back
             pass
     like = f"%{query}%"
+    extra = "".join(f" AND {column} = ?" for column, _ in filters)
     rows = conn.execute(
         "SELECT d.id AS id, d.title AS title, "
         "substr(s.body, 1, 200) AS snippet FROM documents d "
         "LEFT JOIN search_index s ON s.doc_id=d.id "
-        "WHERE d.title LIKE ? OR d.source_document_id LIKE ? "
-        "OR d.issuing_authority LIKE ? OR s.body LIKE ? "
-        "GROUP BY d.id ORDER BY d.updated_at DESC LIMIT ?",
-        (like, like, like, like, limit)).fetchall()
+        "WHERE (d.title LIKE ? OR d.source_document_id LIKE ? "
+        "OR d.issuing_authority LIKE ? OR s.body LIKE ?)" + extra
+        + " GROUP BY d.id ORDER BY d.updated_at DESC LIMIT ?",
+        (like, like, like, like, *[value for _, value in filters],
+         limit)).fetchall()
     return [{"id": r["id"], "title": r["title"],
              "snippet": (r["snippet"] or "")[:200], "engine": "like"}
             for r in rows]

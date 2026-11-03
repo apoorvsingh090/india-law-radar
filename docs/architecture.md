@@ -148,3 +148,10 @@ CLI (argparse) → config.py → logging_config.py → local data dir + sqlite
   `-wal`/`-shm` files beside the database while collected - they are
   part of the live database and must not be copied or deleted under a
   running writer.
+- M18 adds: filter clauses to the three read paths the CLI already had.
+  `list_documents`, `list_reports_filtered`, and `search_fts.search`
+  accept optional metadata filters and build parameterised WHERE clauses
+  (never string interpolation); the FTS branch joins `documents`, the
+  LIKE fallback ANDs the same predicates onto its match, and LIMIT is
+  applied after filtering so counts stay truthful. The web change feed
+  already used `list_reports_filtered`; nothing in its behaviour changed.

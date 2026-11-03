@@ -1,4 +1,4 @@
-"""Command-line interface for India Law Radar (Milestone 17).
+"""Command-line interface for India Law Radar (Milestone 18).
 
 Implemented commands (all functional, no placeholders):
   lawradar init              — create data dir, local settings.yaml, migrate db
@@ -123,11 +123,23 @@ def build_parser() -> argparse.ArgumentParser:
     docs_sub = p_docs.add_subparsers(dest="documents_command", required=True)
     p_list = docs_sub.add_parser("list", help="List stored documents")
     p_list.add_argument("--limit", type=int, default=50)
+    p_list.add_argument("--source", default=None,
+                        help="Only documents from this source id")
+    p_list.add_argument("--type", default=None,
+                        help="Only this document_type")
+    p_list.add_argument("--jurisdiction", default=None,
+                        help="Only this jurisdiction")
     p_show = docs_sub.add_parser("show", help="Show a document + versions")
     p_show.add_argument("document_id", type=int)
     p_search = docs_sub.add_parser("search", help="Keyword search")
     p_search.add_argument("query")
     p_search.add_argument("--limit", type=int, default=20)
+    p_search.add_argument("--source", default=None,
+                          help="Only documents from this source id")
+    p_search.add_argument("--type", default=None,
+                          help="Only this document_type")
+    p_search.add_argument("--jurisdiction", default=None,
+                          help="Only this jurisdiction")
 
     p_reports = sub.add_parser("reports", help="Inspect change reports")
     reports_sub = p_reports.add_subparsers(dest="reports_command", required=True)
@@ -135,6 +147,12 @@ def build_parser() -> argparse.ArgumentParser:
     p_rlist.add_argument("--document", type=int, default=None,
                          help="Only reports for this document id")
     p_rlist.add_argument("--limit", type=int, default=50)
+    p_rlist.add_argument("--type", dest="change_type", default=None,
+                         help="Only this change_type (e.g. text_modified)")
+    p_rlist.add_argument("--status", dest="verification", default=None,
+                         help="Only this verification_status (e.g. approved)")
+    p_rlist.add_argument("--since", default=None,
+                         help="Only reports created on/after YYYY-MM-DD (UTC)")
     p_rshow = reports_sub.add_parser("show", help="Show a report + citations")
     p_rshow.add_argument("report_id", type=int)
     p_rgen = reports_sub.add_parser(
@@ -313,7 +331,7 @@ def cmd_init(args: argparse.Namespace) -> int:
     return 0
 
 
-APP_LABEL = f"India Law Radar v{__version__} (Milestone 17)"
+APP_LABEL = f"India Law Radar v{__version__} (Milestone 18)"
 
 
 def _sqlite_path(db_url: str, data_dir: Path) -> Path | None:
@@ -624,7 +642,9 @@ def cmd_documents(args: argparse.Namespace) -> int:
     conn = store.connect(_db_path(config))
     try:
         if args.documents_command == "list":
-            rows = store.list_documents(conn, args.limit)
+            rows = store.list_documents(
+                conn, args.limit, source=args.source,
+                doc_type=args.type, jurisdiction=args.jurisdiction)
             if args.json:
                 print(json.dumps([dict(r) for r in rows], indent=2))
             else:
@@ -663,7 +683,9 @@ def cmd_documents(args: argparse.Namespace) -> int:
             from lawradar.search import fts as search_fts
 
             search_fts.ensure_indexed(conn)
-            rows = search_fts.search(conn, args.query, args.limit)
+            rows = search_fts.search(
+                conn, args.query, args.limit, source=args.source,
+                doc_type=args.type, jurisdiction=args.jurisdiction)
             if args.json:
                 print(json.dumps(rows, indent=2))
             else:
@@ -687,7 +709,23 @@ def cmd_reports(args: argparse.Namespace) -> int:
     conn = store.connect(_db_path(config))
     try:
         if args.reports_command == "list":
-            rows = store.list_reports(conn, args.limit, args.document)
+            since = None
+            if args.since:
+                from datetime import datetime as _dt
+
+                try:
+                    day = _dt.strptime(args.since, "%Y-%m-%d")
+                except ValueError:
+                    print("--since must be YYYY-MM-DD (UTC)", file=sys.stderr)
+                    return 2
+                since = day.strftime("%Y-%m-%dT00:00:00.000Z")
+            if (args.change_type or args.verification or since):
+                rows = store.list_reports_filtered(
+                    conn, document_id=args.document, limit=args.limit,
+                    change_type=args.change_type,
+                    verification=args.verification, since=since)
+            else:
+                rows = store.list_reports(conn, args.limit, args.document)
             if args.json:
                 print(json.dumps([dict(r) for r in rows], indent=2,
                                  default=str))

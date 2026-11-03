@@ -271,13 +271,28 @@ def list_versions(conn: sqlite3.Connection,
 
 # -- documents queries ------------------------------------------------------
 
-def list_documents(conn: sqlite3.Connection, limit: int = 50) -> list[sqlite3.Row]:
+def list_documents(conn: sqlite3.Connection, limit: int = 50, *,
+                   source: str | None = None,
+                   doc_type: str | None = None,
+                   jurisdiction: str | None = None) -> list[sqlite3.Row]:
+    clauses, params = [], []
+    if source:
+        clauses.append("d.source_id = ?")
+        params.append(source)
+    if doc_type:
+        clauses.append("d.document_type = ?")
+        params.append(doc_type)
+    if jurisdiction:
+        clauses.append("d.jurisdiction = ?")
+        params.append(jurisdiction)
+    where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+    params.append(limit)
     return list(
         conn.execute(
             "SELECT d.*, (SELECT COUNT(*) FROM document_versions v "
             "WHERE v.document_id=d.id) AS versions FROM documents d "
-            "ORDER BY d.updated_at DESC LIMIT ?",
-            (limit,),
+            f"{where} ORDER BY d.updated_at DESC LIMIT ?",
+            params,
         )
     )
 
@@ -448,15 +463,21 @@ def list_published_reports(
 def list_reports_filtered(
     conn: sqlite3.Connection,
     *,
+    document_id: int | None = None,
     source: str | None = None,
     jurisdiction: str | None = None,
     doc_type: str | None = None,
     verification: str | None = None,
+    change_type: str | None = None,
+    since: str | None = None,
     limit: int = 100,
 ) -> list[sqlite3.Row]:
-    """Change-feed query with optional filters (web UI + API)."""
+    """Change-feed query with optional filters (web UI + API + CLI)."""
     clauses = []
     params: list = []
+    if document_id is not None:
+        clauses.append("r.document_id = ?")
+        params.append(document_id)
     if source:
         clauses.append("d.source_id = ?")
         params.append(source)
@@ -469,6 +490,12 @@ def list_reports_filtered(
     if verification:
         clauses.append("r.verification_status = ?")
         params.append(verification)
+    if change_type:
+        clauses.append("r.change_type = ?")
+        params.append(change_type)
+    if since:
+        clauses.append("r.created_at >= ?")
+        params.append(since)
     where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
     params.append(limit)
     return list(conn.execute(

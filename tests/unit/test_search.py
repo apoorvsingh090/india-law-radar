@@ -94,3 +94,32 @@ def test_reindex_rebuilds(tmp_path):
         assert fts.ensure_indexed(conn) == 0  # nothing missing
     finally:
         conn.close()
+
+
+def test_search_filters_narrow_by_metadata(tmp_path):
+    fts.reset_cache()
+    path = tmp_path / "f.db"
+    store.init_db(path)
+    conn = store.connect(path)
+    try:
+        _seed(conn)
+        doc2 = store.get_or_create_document(
+            conn, source_id="s", source_document_id="d2",
+            title="Central Rules", document_type="Rule",
+            jurisdiction="central")
+        ver2 = store.create_version(
+            conn, document_id=doc2, content_sha256="b" * 64,
+            raw_storage_path=None, extracted_text_path=None,
+            extraction_method="text", extraction_status="ok",
+            parser_warnings=[])
+        fts.upsert_index(conn, doc_id=doc2, version_id=ver2,
+                         title="Central Rules",
+                         body="Quarterly reporting for central offices.")
+        conn.commit()
+        hits = fts.search(conn, "quarterly", jurisdiction="central")
+        assert [h["id"] for h in hits] == [doc2]
+        none = fts.search(conn, "quarterly", doc_type="Act")
+        assert none == []
+    finally:
+        conn.close()
+

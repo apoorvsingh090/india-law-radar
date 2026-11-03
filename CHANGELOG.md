@@ -5,6 +5,22 @@ All notable changes to India Law Radar will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.18.0] - 2026-11-03
+
+### Added
+
+- Milestone 18 (CLI filters): `documents list` and `documents search`
+  accept `--source ID`, `--type TYPE`, and `--jurisdiction J`;
+  `reports list` accepts `--document ID`, `--type CHANGE_TYPE`,
+  `--status VERIFICATION_STATUS`, and `--since YYYY-MM-DD` (UTC
+  midnight; malformed dates exit 2)
+- Filtering runs in SQL (documents/reports) and inside both search
+  engines (FTS and LIKE fallback), so limits and `--json` output only
+  ever contain matching rows
+- `store.list_documents` gained keyword filters; `store.list_reports_filtered`
+  gained `document_id`, `change_type`, and `since`; `search_fts.search`
+  gained metadata filters without changing ranking
+
 ## [0.17.0] - 2026-11-03
 
 ### Changed

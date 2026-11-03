@@ -65,4 +65,4 @@ Out of scope:
 
 ## Supported versions
 
-Only the latest code on `main` (currently `0.17.0`) is supported.
+Only the latest code on `main` (currently `0.18.0`) is supported.

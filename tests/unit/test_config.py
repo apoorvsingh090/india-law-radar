@@ -1,5 +1,4 @@
 """Config loading tests (Milestone 1)."""
-import os
 from pathlib import Path
 
 import pytest
@@ -20,9 +19,10 @@ def test_defaults_load_without_config_file(tmp_path, monkeypatch):
 
 
 def test_example_yaml_loads():
-    example = Path("config/settings.example.yaml")
+    example = (Path(__file__).resolve().parents[2]
+               / "src" / "lawradar" / "data" / "settings.example.yaml")
     if not example.is_file():
-        pytest.skip("run from repo root; example config not found")
+        pytest.skip("packaged example config not found")
     config = load_settings(str(example))
     assert config.data_dir
     assert config.http_timeout_seconds > 0

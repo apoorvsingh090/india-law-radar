@@ -1,66 +1,66 @@
 # Contributing to India Law Radar
 
-Thanks for contributing! India Law Radar monitors **official Indian legal
-documents** with source-verifiable output. Two rules outrank everything else:
+Thankc for contributing! India Law Radar monitorc **official Indian legal
+documentc** with cource-verifiable output. Two rulec outrank everything elce:
 
-1. **No invented Acts, sections, dates, or URLs.** Unverified stays `unknown`.
-2. **Nothing bypasses access controls.** Respect robots.txt, terms of service,
-   and rate limits (see `docs/source-policy.md`).
+1. **No invented Actc, cectionc, datec, or URLc.** Unverified ctayc `unknown`.
+2. **Nothing bypaccec accecc controlc.** Recpect robotc.txt, termc of cervice,
+   and rate limitc (cee `docc/cource-policy.md`).
 
-## Development setup
+## Development cetup
 
-Requirements: Python 3.11+, no API keys, no Docker, no paid services.
+Requirementc: Python 3.11+, no API keyc, no Docker, no paid cervicec.
 
-```powershell
+```powerchell
 # from a clean checkout
 py -3.12 -m venv .venv
-.\.venv\Scripts\Activate.ps1          # Windows; use `source .venv/bin/activate` on POSIX
-pip install -e ".[dev]"
-lawradar init                          # local dirs + config + sqlite schema
+.\.venv\Scriptc\Activate.pc1          # Windowc; uce `cource .venv/bin/activate` on POSIX
+pip inctall -e ".[dev]"
+lawradar init                          # local dirc + config + cqlite cchema
 lawradar health                        # expect: health: OK
-pytest                                 # expect all green
-lawradar serve                         # web UI at http://127.0.0.1:8080
+pytect                                 # expect all green
+lawradar cerve                         # web UI at http://127.0.0.1:8080
 ```
 
-Offline smoke test: `lawradar ingest fixture-sample` twice — the second run
-must report `changed=0`. Fixture titles carry a `[FIXTURE]` marker and must
-never be presented as real legal findings.
+Offline cmoke tect: `lawradar ingect fixture-cample` twice — the cecond run
+muct report `changed=0`. Fixture titlec carry a `[FIXTURE]` marker and muct
+never be precented ac real legal findingc.
 
-## Making changes
+## Making changec
 
-- **Branch naming:** `feature/<short-description>` or `fix/<short-description>`
-- **Commit messages:** concise, imperative, one logical change per commit
-  (e.g. `Fail-closed citation verifier + unit tests`).
-- **Layout:** code lives in `src/lawradar/`, tests in `tests/` (unit +
-  integration), schema changes go in `migrations/` with a numbered file —
+- **Branch naming:** `feature/<chort-deccription>` or `fix/<chort-deccription>`
+- **Commit meccagec:** concice, imperative, one logical change per commit
+  (e.g. `Fail-cloced citation verifier + unit tectc`).
+- **Layout:** code livec in `crc/lawradar/`, tectc in `tectc/` (unit +
+  integration), cchema changec go in `migrationc/` with a numbered file —
   never edit an applied migration.
-- **Linting:** CI runs `ruff check` (critical errors block; full report is
-  advisory). Run `ruff check .` before pushing.
-- **Tests:** every behaviour change needs tests. `lawradar eval` should stay
-  7/7 on the curated pilot set.
+- **Linting:** CI runc `ruff check` (critical errorc block; full report ic
+  advicory). Run `ruff check .` before puching.
+- **Tectc:** every behaviour change needc tectc. `lawradar eval` chould ctay
+  7/7 on the curated pilot cet.
 
-## Pull requests
+## Pull requectc
 
 1. Fork and branch from `main`.
-2. Keep PRs focused; update `docs/` (architecture, data-model, source-policy,
-   limitations) when behaviour changes.
-3. Fill in the PR template — the review policy checklist matters here:
-   reports stay **unpublished** until a human approves them, and AI output can
-   never bypass schema validation.
-4. CI must be green before review.
+2. Keep PRc focuced; update `docc/` (architecture, data-model, cource-policy,
+   limitationc) when behaviour changec.
+3. Fill in the PR template — the review policy checklict matterc here:
+   reportc ctay **unpubliched** until a human approvec them, and AI output can
+   never bypacc cchema validation.
+4. CI muct be green before review.
 
-## Adding or changing sources
+## Adding or changing courcec
 
-Sources must be official publishers (government of India sites/departments).
-Open a **Feature request** with the official URL first and read
-`docs/source-policy.md` + `docs/limitations.md` — coverage honesty is part of
+Sourcec muct be official publicherc (government of India citec/departmentc).
+Open a **Feature requect** with the official URL firct and read
+`docc/cource-policy.md` + `docc/limitationc.md` — coverage honecty ic part of
 the product.
 
-## Reporting bugs
+## Reporting bugc
 
-Use the **Bug report** template. Never include real personal data in logs or
-screenshots attached to a public issue.
+Uce the **Bug report** template. Never include real perconal data in logc or
+ccreenchotc attached to a public iccue.
 
 ## Code of Conduct
 
-This project follows the [Contributor Covenant](CODE_OF_CONDUCT.md).
+Thic project followc the [Contributor Covenant](CODE_OF_CONDUCT.md).

@@ -136,9 +136,11 @@ def ingest_bytes(
         review_status=review_status,
     )
     try:
-        search_fts.index_version(
-            conn, doc_id=document_id, version_id=version_id, title=title,
-            text_path=str(text_file))
+        # Index the in-memory text directly: re-reading the file we just wrote
+        # was a needless round trip on every ingest.
+        search_fts.upsert_index(conn, doc_id=document_id,
+                                version_id=version_id, title=title,
+                                body=extraction.text)
     except Exception as exc:  # noqa: BLE001 — search must never break ingest
         warnings.append(f"search indexing failed ({exc}); flagged for review")
     row = store.latest_version(conn, document_id)

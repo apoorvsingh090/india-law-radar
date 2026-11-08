@@ -85,7 +85,7 @@ def test_reindex_rebuilds(tmp_path):
     store.init_db(path)
     conn = store.connect(path)
     try:
-        doc = _seed(conn)
+        _seed(conn)
         conn.execute("DELETE FROM search_index")
         conn.commit()
         assert fts.search(conn, "quarterly") == []

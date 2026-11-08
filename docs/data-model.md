@@ -4,7 +4,7 @@ Tables per build spec §5: `sources`, `documents`, `document_versions`,
 `change_reports`, `citations`, `ingestion_runs`, `review_tasks`.
 
 Rules:
-- Migrations under `migrations/` (SQL files, applied in order).
+- Migrations under `src/lawradar/migrations/` (SQL files, applied in order).
 - Foreign keys + indexes enforced; no dual SQLite/Postgres implementations —
   one repository layer, SQLite locally, Postgres in deployment.
 - Dates stay granular: signed/made, published, retrieved, commenced,
@@ -14,7 +14,7 @@ Rules:
 M1 creates only a `_meta(schema_version)` marker table via `lawradar init`
 so the sqlite path is proven before the real schema lands.
 
-**Milestone 2 update:** `migrations/001_init.sql` creates the full schema
+**Milestone 2 update:** `src/lawradar/migrations/001_init.sql` creates the full schema
 (sources, documents, document_versions with UNIQUE(document_id,
 content_sha256), change_reports, citations, ingestion_runs, review_tasks).
 `lawradar init` applies migrations; the pipeline writes sources,

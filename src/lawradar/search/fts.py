@@ -9,25 +9,34 @@ from __future__ import annotations
 
 from pathlib import Path
 
-_FTS_OK: bool | None = None
+_FTS_OK: dict[str, bool] = {}
+
+
+def _cache_key(conn) -> str:
+    try:
+        for row in conn.execute("PRAGMA database_list"):
+            if row[1] == "main" and row[2]:
+                return str(row[2])
+    except Exception:  # noqa: BLE001 — exotic wrappers
+        pass
+    return f"conn:{id(conn)}"
 
 
 def fts_available(conn) -> bool:
     """True when the connected database supports FTS5 queries."""
-    global _FTS_OK
-    if _FTS_OK is not None:
-        return _FTS_OK
+    key = _cache_key(conn)
+    if key in _FTS_OK:
+        return _FTS_OK[key]
     try:
         conn.execute("SELECT count(*) FROM search_fts WHERE search_fts MATCH 'x'").fetchone()
-        _FTS_OK = True
+        _FTS_OK[key] = True
     except Exception:  # noqa: BLE001 — missing table/module means no FTS
-        _FTS_OK = False
-    return _FTS_OK
+        _FTS_OK[key] = False
+    return _FTS_OK[key]
 
 
 def reset_cache() -> None:  # test helper
-    global _FTS_OK
-    _FTS_OK = None
+    _FTS_OK.clear()
 
 
 def _safe_match(query: str) -> str:
@@ -104,6 +113,7 @@ def search(conn, query: str, limit: int = 20, *,
             extra = "".join(f" AND {column} = ?" for column, _ in filters)
             rows = conn.execute(
                 "SELECT s.doc_id AS id, s.title AS title, "
+                "d.official_url AS official_url, "
                 "snippet(search_fts, 1, '<b>', '</b>', ' … ', 12) AS snippet "
                 "FROM search_fts JOIN search_index s "
                 "ON s.rowid = search_fts.rowid "
@@ -113,6 +123,7 @@ def search(conn, query: str, limit: int = 20, *,
                 (_safe_match(query),
                  *[value for _, value in filters], limit)).fetchall()
             return [{"id": r["id"], "title": r["title"],
+                     "official_url": r["official_url"] or "",
                      "snippet": r["snippet"], "engine": "fts"}
                     for r in rows]
         except Exception:  # noqa: BLE001 — bad MATCH syntax falls back
@@ -120,7 +131,7 @@ def search(conn, query: str, limit: int = 20, *,
     like = f"%{query}%"
     extra = "".join(f" AND {column} = ?" for column, _ in filters)
     rows = conn.execute(
-        "SELECT d.id AS id, d.title AS title, "
+        "SELECT d.id AS id, d.title AS title, d.official_url AS official_url, "
         "substr(s.body, 1, 200) AS snippet FROM documents d "
         "LEFT JOIN search_index s ON s.doc_id=d.id "
         "WHERE (d.title LIKE ? OR d.source_document_id LIKE ? "
@@ -129,5 +140,6 @@ def search(conn, query: str, limit: int = 20, *,
         (like, like, like, like, *[value for _, value in filters],
          limit)).fetchall()
     return [{"id": r["id"], "title": r["title"],
+             "official_url": r["official_url"] or "",
              "snippet": (r["snippet"] or "")[:200], "engine": "like"}
             for r in rows]

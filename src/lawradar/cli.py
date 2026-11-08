@@ -290,9 +290,13 @@ def cmd_init(args: argparse.Namespace) -> int:
     data_dir = ensure_data_dir(config)
     logger.info("data dir ready: %s", data_dir)
 
-    # Copy example settings to config/settings.yaml when missing.
+    # Copy example settings to config/settings.yaml when missing. The example
+    # ships inside the installed package, so this works outside a git checkout.
     dest = Path("config/settings.yaml")
     example = Path("config/settings.example.yaml")
+    if not example.is_file():
+        example = (Path(__file__).resolve().parent
+                   / "data" / "settings.example.yaml")
     copied = False
     if dest.exists() and not args.force:
         logger.info("config already exists: %s (use --force to overwrite)", dest)

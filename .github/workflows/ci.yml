@@ -44,9 +44,8 @@ jobs:
       - name: Install ruff
         run: pip install ruff
 
-      - name: Ruff â€” critical errors (blocking)
+      - name: Ruff — critical errors (blocking)
         run: ruff check --select E9,F63,F7,F82 .
 
-      - name: Ruff â€” full report (non-blocking)
-        continue-on-error: true
-        run: ruff check . --output-format=github
+      - name: Ruff full check (blocking)
+        run: ruff check .

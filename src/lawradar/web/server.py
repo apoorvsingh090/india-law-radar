@@ -60,9 +60,8 @@ class Handler(BaseHTTPRequestHandler):
 
     # -- helpers ---------------------------------------------------------
     def _db(self):
-        conn = store.connect(self.server.db_path)
-        store.apply_migrations(conn)
-        return conn
+        # Migrations are applied once when the server is built, not per request.
+        return store.connect(self.server.db_path)
 
     def _send(self, code: int, body: str, ctype: str = "text/html; charset=utf-8",
               headers: dict | None = None) -> None:
@@ -294,8 +293,7 @@ class Handler(BaseHTTPRequestHandler):
         gaps = [f"{s['id']}: {s['coverage_notes'] or 'no coverage notes'}"
                 for s in sources if not s["enabled"]
                 or s["terms_review_status"] == "not_reviewed"]
-        unpublished = sum(1 for r in store.list_reports(conn, limit=1000)
-                          if not r["published_at"])
+        unpublished = store.count_unpublished_reports(conn)
         self._page("Dashboard", pages.dashboard({
             "sources": sources, "source_count": len(sources),
             "recent_reports": reports, "pending_review": pending,
@@ -329,12 +327,12 @@ class Handler(BaseHTTPRequestHandler):
             doc_type=filt["type"] or None,
             verification=filt["status"] or None, limit=100)]
         for report in reports:
-            document = store.get_document(conn, report["document_id"])
-            report["issuing_authority"] = document["issuing_authority"] or ""
-            report["jurisdiction"] = document["jurisdiction"] or "unknown"
-            report["document_type"] = document["document_type"] or "unknown"
-            report["official_url"] = document["official_url"] or ""
-            report["retrieved_at"] = self._retrieved(conn, report)
+            # Document metadata and retrieval time come back in the same query.
+            report["issuing_authority"] = report.pop("doc_issuing_authority") or ""
+            report["jurisdiction"] = report.pop("doc_jurisdiction") or "unknown"
+            report["document_type"] = report.pop("doc_document_type") or "unknown"
+            report["official_url"] = report.pop("doc_official_url") or ""
+            report["retrieved_at"] = report.pop("retrieved_at") or ""
         docs = [dict(r) for r in store.list_documents(conn, limit=1000)]
         options = {
             "sources": sorted({d["source_id"] for d in docs}),
@@ -345,12 +343,6 @@ class Handler(BaseHTTPRequestHandler):
                          "rejected", "needs_changes"],
         }
         self._page("Changes", pages.changes_feed(reports, filt, options))
-
-    def _retrieved(self, conn, report: dict) -> str:
-        row = conn.execute(
-            "SELECT retrieved_at FROM document_versions WHERE id=?",
-            (report["new_version_id"],)).fetchone()
-        return row["retrieved_at"] if row else ""
 
     def _report(self, conn, report_id: int, query: dict) -> None:
         report = store.get_report(conn, report_id)
@@ -411,14 +403,13 @@ class Handler(BaseHTTPRequestHandler):
             jurisdiction=filters.get("jurisdiction") or None)
             if query_text else [])
 
-        def _official(doc_id: int) -> str:
-            document = store.get_document(conn, doc_id)
-            return (document["official_url"] or "") if document else ""
-
+        official_urls = {}
         for result in results:
             result["doc_id"] = result.pop("id")
+            official_urls[result["doc_id"]] = result.get("official_url") or ""
         self._page("Search", pages.search_page(
-            query_text, results, _official, filters, self._doc_options(conn)))
+            query_text, results, lambda doc_id: official_urls.get(doc_id, ""),
+            filters, self._doc_options(conn)))
 
     def _doc_options(self, conn) -> dict:
         def _distinct(column: str) -> list[str]:
@@ -657,6 +648,7 @@ def build_server(db_path: str = "data/lawradar.db", host: str = "127.0.0.1",
                  post_limit_per_minute: int = 30,
                  config=None) -> ThreadingHTTPServer:
     """Create (but do not start) the web server."""
+    store.init_db(db_path)  # one-time schema setup; requests no longer migrate
     server = ThreadingHTTPServer((host, port), Handler)
     server.db_path = db_path
     server.token = token or ""

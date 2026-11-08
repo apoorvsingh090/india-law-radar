@@ -70,10 +70,6 @@ def verify_citation(citation: dict, *, official_url: str,
     if url and official_url and url != official_url:
         reasons.append(f"source URL differs from official URL {official_url!r}")
     return {"ok": not reasons, "reasons": reasons}
-    url = (citation.get("source_url") or "").strip()
-    if url and official_url and url != official_url:
-        reasons.append(f"source URL differs from official URL {official_url!r}")
-    return {"ok": not reasons, "reasons": reasons}
 
 
 def verify_report(conn, report_id: int) -> dict:

@@ -8,7 +8,7 @@ never silently skipped.
 from __future__ import annotations
 
 import urllib.parse
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 
 try:
@@ -97,7 +97,9 @@ def find_sources_file(explicit: str | None = None) -> Path | None:
     for path in candidates:
         if path.is_file():
             return path
-    return None
+    # Installed (wheel) layouts carry the shipped example inside the package.
+    packaged = Path(__file__).resolve().parent.parent / "data" / "sources.example.yaml"
+    return packaged if packaged.is_file() else None
 
 
 def load_sources(explicit: str | None = None) -> list[SourceRecord]:

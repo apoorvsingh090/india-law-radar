@@ -19,8 +19,8 @@ class ReviewError(ValueError):
 
 def open_tasks_for_report(conn, report_id: int) -> list:
     """Pending review tasks for one report (usually zero or one)."""
-    return [t for t in store.list_review_tasks(conn, status="pending")
-            if t["change_report_id"] == report_id]
+    return list(store.list_review_tasks_for_report(conn, report_id,
+                                                   status="pending"))
 
 
 def ensure_task(conn, *, report_id: int, document_version_id: int | None,
@@ -99,10 +99,7 @@ def resolve(conn, *, report_id: int, decision: str, reviewer: str = "",
 
 def audit_trail(conn, report_id: int) -> list[dict]:
     """Full review history for a report, oldest first (audit trail)."""
-    tasks = [dict(t) for t in store.list_review_tasks(conn)
-             if t["change_report_id"] == report_id]
-    tasks.sort(key=lambda t: t["id"])
-    return tasks
+    return [dict(t) for t in store.list_review_tasks_for_report(conn, report_id)]
 
 
 def queue_summary(conn) -> dict:

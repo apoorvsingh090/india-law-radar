@@ -17,7 +17,9 @@ import json
 import sqlite3
 from pathlib import Path
 
-MIGRATIONS_DIR = Path(__file__).resolve().parents[3] / "migrations"
+MIGRATIONS_DIR = Path(__file__).resolve().parent.parent / "migrations"
+if not MIGRATIONS_DIR.is_dir():  # editable installs predate the package move
+    MIGRATIONS_DIR = Path(__file__).resolve().parents[3] / "migrations"
 BUSY_TIMEOUT_MS = 5000
 
 
@@ -289,9 +291,9 @@ def list_documents(conn: sqlite3.Connection, limit: int = 50, *,
     params.append(limit)
     return list(
         conn.execute(
-            "SELECT d.*, (SELECT COUNT(*) FROM document_versions v "
-            "WHERE v.document_id=d.id) AS versions FROM documents d "
-            f"{where} ORDER BY d.updated_at DESC LIMIT ?",
+            "SELECT d.*, COUNT(v.id) AS versions FROM documents d "
+            "LEFT JOIN document_versions v ON v.document_id = d.id "
+            f"{where} GROUP BY d.id ORDER BY d.updated_at DESC LIMIT ?",
             params,
         )
     )
@@ -307,10 +309,11 @@ def search_documents(conn: sqlite3.Connection, query: str,
     like = f"%{query}%"
     return list(
         conn.execute(
-            "SELECT d.*, (SELECT COUNT(*) FROM document_versions v "
-            "WHERE v.document_id=d.id) AS versions FROM documents d "
+            "SELECT d.*, COUNT(v.id) AS versions FROM documents d "
+            "LEFT JOIN document_versions v ON v.document_id = d.id "
             "WHERE d.title LIKE ? OR d.source_document_id LIKE ? "
-            "OR d.issuing_authority LIKE ? ORDER BY d.updated_at DESC LIMIT ?",
+            "OR d.issuing_authority LIKE ? "
+            "GROUP BY d.id ORDER BY d.updated_at DESC LIMIT ?",
             (like, like, like, limit),
         )
     )
@@ -499,9 +502,23 @@ def list_reports_filtered(
     where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
     params.append(limit)
     return list(conn.execute(
-        "SELECT r.*, d.title AS document_title FROM change_reports r "
-        f"JOIN documents d ON d.id=r.document_id {where} "
-        "ORDER BY r.id DESC LIMIT ?", params))
+        "SELECT r.*, d.title AS document_title, "
+        "d.issuing_authority AS doc_issuing_authority, "
+        "d.jurisdiction AS doc_jurisdiction, "
+        "d.document_type AS doc_document_type, "
+        "d.official_url AS doc_official_url, "
+        "v.retrieved_at AS retrieved_at "
+        "FROM change_reports r "
+        "JOIN documents d ON d.id=r.document_id "
+        "LEFT JOIN document_versions v ON v.id=r.new_version_id "
+        f"{where} ORDER BY r.id DESC LIMIT ?", params))
+
+
+def count_unpublished_reports(conn: sqlite3.Connection) -> int:
+    row = conn.execute(
+        "SELECT COUNT(*) AS c FROM change_reports WHERE published_at IS NULL"
+    ).fetchone()
+    return int(row["c"])
 
 
 def list_citations(conn: sqlite3.Connection,
@@ -553,6 +570,26 @@ def list_review_tasks(
         "SELECT t.*, r.document_id AS document_id FROM review_tasks t "
         "LEFT JOIN change_reports r ON r.id=t.change_report_id "
         "WHERE t.status=? ORDER BY t.id DESC LIMIT ?", (status, limit)))
+
+
+def list_review_tasks_for_report(
+    conn: sqlite3.Connection, report_id: int, status: str | None = None
+) -> list[sqlite3.Row]:
+    """Every task for one report, oldest first — never truncated.
+
+    Filtering in SQL (not Python after a 100-row cap) keeps the audit trail
+    complete and stops open tasks being missed on busy instances.
+    """
+    if status is None:
+        return list(conn.execute(
+            "SELECT t.*, r.document_id AS document_id FROM review_tasks t "
+            "LEFT JOIN change_reports r ON r.id=t.change_report_id "
+            "WHERE t.change_report_id=? ORDER BY t.id", (report_id,)))
+    return list(conn.execute(
+        "SELECT t.*, r.document_id AS document_id FROM review_tasks t "
+        "LEFT JOIN change_reports r ON r.id=t.change_report_id "
+        "WHERE t.change_report_id=? AND t.status=? ORDER BY t.id",
+        (report_id, status)))
 
 
 def count_review_tasks_by_status(conn: sqlite3.Connection) -> dict[str, int]:

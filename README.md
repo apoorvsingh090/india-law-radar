@@ -161,7 +161,7 @@ something needs a human. It is read-only, renders server-side, and
 escapes all stored text.
 
 Try without network: `lawradar ingest fixture-sample --sources-file
-config/sources.example.yaml` twice — the second run reports `changed=0`
+src/lawradar/data/sources.example.yaml` twice — the second run reports `changed=0`
 (idempotent dedup). All fixture titles carry a `[FIXTURE]` marker and
 must never be presented as real legal findings.
 
@@ -173,7 +173,7 @@ and `.env.example`.
 ## Layout
 
 ```text
-config/        example YAML (local settings.yaml is git-ignored)
+src/lawradar/data/  example YAML (local config/settings.yaml is git-ignored)
 docs/          architecture, data-model, source-policy, evaluation, limitations,
                pilot runbook (real-source operation, M8-10), backup/restore
                (M10), evidence bundles in the runbook (M12)
@@ -182,7 +182,7 @@ src/lawradar/  cli, config, logging, db/store + db/backup, sources/*,
                reporting/*, review/*, ai/*, notify/dispatch (webhooks),
                evidence/* (bundles), search/fts, web/* (incl. Atom feed),
                evaluation/*
-migrations/    001-008 (schema, ai_attempts, FTS index, feedback, retirement,
+src/lawradar/migrations/ 001-008 (schema, ai_attempts, FTS index, feedback, retirement,
                notifications, bundles, http validators)
 tests/         unit + integration + fixtures + evaluation notes
 scripts/       operator helpers (probe script; daily pilot loop is CLI-only)
